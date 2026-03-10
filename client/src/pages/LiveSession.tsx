@@ -1,13 +1,17 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useSyncExternalStore } from "react";
 import { useLocation, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { Square, Clock, Zap, Play, Mic, User, Phone } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Square, Clock, Zap, Play, Mic, User, Phone, Monitor, Send } from "lucide-react";
 import { socketClient } from "@/lib/socket";
+import { teamsService } from "@/lib/teamsIntegration";
 import TranscriptPanel from "@/components/TranscriptPanel";
 import CoachingPanel from "@/components/CoachingPanel";
+import TeamsStatusCard from "@/components/TeamsStatusCard";
 import type { TranscriptChunk, CoachingPrompt, SessionConfig, Session } from "@shared/schema";
 import { callTypeLabels, priorityLabels } from "@shared/schema";
 
@@ -16,6 +20,78 @@ function formatTimer(ms: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function TeamsSidebarSection() {
+  const teamsStatus = useSyncExternalStore(
+    (cb) => teamsService.subscribe(cb),
+    () => teamsService.getStatus()
+  );
+
+  const [injectText, setInjectText] = useState("");
+  const [injectSpeaker, setInjectSpeaker] = useState<"rep" | "prospect">("rep");
+
+  const handleInject = () => {
+    if (!injectText.trim()) return;
+    const event = teamsService.injectTranscriptEvent(injectText.trim(), injectSpeaker);
+    socketClient.send({
+      type: "transcript_chunk",
+      speaker: event.speaker,
+      text: event.text,
+    });
+    setInjectText("");
+  };
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-muted-foreground uppercase tracking-wider">Teams</p>
+      <TeamsStatusCard status={teamsStatus} compact />
+
+      {teamsStatus.transcriptStatus === "unavailable" && (
+        <div className="space-y-1.5 pt-2 border-t">
+          <p className="text-xs text-yellow-500 dark:text-yellow-400">Transcript unavailable</p>
+          <p className="text-xs text-muted-foreground">
+            Use the transcript injection below, or end this session and switch modes.
+          </p>
+        </div>
+      )}
+
+      {(teamsStatus.transcriptStatus === "demo_injection" || teamsStatus.transcriptStatus === "scaffolded" || teamsStatus.transcriptStatus === "unavailable") && (
+        <div className="space-y-2 pt-2 border-t">
+          <p className="text-xs text-muted-foreground">Inject Transcript</p>
+          <Select value={injectSpeaker} onValueChange={(v) => setInjectSpeaker(v as "rep" | "prospect")}>
+            <SelectTrigger className="h-7 text-xs" data-testid="select-inject-speaker">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="rep">Rep</SelectItem>
+              <SelectItem value="prospect">Prospect</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="flex gap-1">
+            <Input
+              data-testid="input-inject-transcript"
+              className="h-7 text-xs"
+              placeholder="Type transcript..."
+              value={injectText}
+              onChange={(e) => setInjectText(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleInject()}
+            />
+            <Button
+              data-testid="button-inject-transcript"
+              variant="secondary"
+              size="sm"
+              className="h-7 w-7 p-0 flex-shrink-0"
+              onClick={handleInject}
+              disabled={!injectText.trim()}
+            >
+              <Send className="w-3 h-3" />
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function LiveSession() {
@@ -179,6 +255,17 @@ export default function LiveSession() {
     );
   }
 
+  const modeBadge = () => {
+    switch (config.mode) {
+      case "simulation":
+        return <><Play className="w-3 h-3 mr-1" /> Simulation</>;
+      case "live":
+        return <><Mic className="w-3 h-3 mr-1" /> Live</>;
+      case "teams":
+        return <><Monitor className="w-3 h-3 mr-1" /> Teams</>;
+    }
+  };
+
   return (
     <div className="h-screen flex flex-col bg-background">
       <header className="flex items-center justify-between gap-2 px-4 py-2.5 border-b bg-card flex-shrink-0">
@@ -188,13 +275,14 @@ export default function LiveSession() {
           </div>
           <span className="font-semibold text-sm" data-testid="text-header-title">RepReady</span>
           <Separator orientation="vertical" className="h-5" />
-          <Badge variant="secondary" className="no-default-active-elevate">
-            {config.mode === "simulation" ? (
-              <><Play className="w-3 h-3 mr-1" /> Simulation</>
-            ) : (
-              <><Mic className="w-3 h-3 mr-1" /> Live</>
-            )}
+          <Badge variant="secondary" className="no-default-active-elevate" data-testid="badge-session-mode">
+            {modeBadge()}
           </Badge>
+          {config.mode === "teams" && config.teamsContext?.meetingTitle && (
+            <span className="text-xs text-muted-foreground truncate max-w-48" data-testid="text-teams-meeting-title">
+              {config.teamsContext.meetingTitle}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5 text-sm font-mono" data-testid="text-timer">
@@ -275,6 +363,10 @@ export default function LiveSession() {
                 </Button>
               )}
             </div>
+          )}
+
+          {config.mode === "teams" && (
+            <TeamsSidebarSection />
           )}
 
           {simulationComplete && (

@@ -1,7 +1,7 @@
 # RepReady - Real-time SDR Coaching Demo
 
 ## Overview
-RepReady is a real-time AI coaching demo for SDR readiness. It supports simulated and live sales calls, detects coaching-relevant moments, surfaces short coaching prompts during the session, and generates a post-call summary with a readiness scorecard.
+RepReady is a real-time AI coaching demo for SDR readiness. It supports simulated, live, and Microsoft Teams-integrated sales calls, detects coaching-relevant moments, surfaces short coaching prompts during the session, and generates a post-call summary with a readiness scorecard.
 
 ## Architecture
 - **Frontend**: React + Vite + TypeScript + Tailwind + shadcn/ui
@@ -19,11 +19,14 @@ RepReady is a real-time AI coaching demo for SDR readiness. It supports simulate
 - `server/services/simulationService.ts` - Pre-built transcript scripts
 - `server/services/summaryService.ts` - Post-call summary generation
 - `server/services/storageService.ts` - In-memory session storage
-- `client/src/pages/SessionSetup.tsx` - Session configuration form
+- `server/services/llmService.ts` - OpenAI LLM integration
+- `client/src/pages/SessionSetup.tsx` - Session configuration form (all 3 modes)
 - `client/src/pages/LiveSession.tsx` - Live 3-column session view
 - `client/src/pages/SessionReview.tsx` - Post-call review with tabs
 - `client/src/pages/PreviousSessions.tsx` - Session history list
 - `client/src/lib/socket.ts` - WebSocket client wrapper
+- `client/src/lib/teamsIntegration.ts` - Microsoft Teams SDK integration service
+- `client/src/components/TeamsStatusCard.tsx` - Teams status display component
 
 ## LLM Integration
 - When `OPENAI_API_KEY` is set, coaching prompts are evaluated by OpenAI (gpt-4o-mini)
@@ -34,6 +37,33 @@ RepReady is a real-time AI coaching demo for SDR readiness. It supports simulate
 ## Modes
 1. **Simulation Mode** - Uses scripted transcripts that stream automatically
 2. **Live Mode** - Browser microphone capture (requires transcription API setup)
+3. **Teams Mode** - Microsoft Teams integration surface with context detection, meeting metadata capture, and transcript injection
+
+## Microsoft Teams Integration
+### What works now
+- Teams mode selectable in session setup with dedicated UI
+- Microsoft Teams JS SDK initialization and context detection
+- Teams status card showing SDK, context, and transcript availability
+- Demo Teams Context toggle for local/standalone testing
+- Manual transcript event injection during Teams sessions
+- Teams meeting metadata (title, ID, user) attached to session artifacts
+- Teams metadata displayed in session review
+- Graceful fallback to simulation or live mode when not in Teams
+
+### What is scaffolded (requires Microsoft setup)
+- Real Teams meeting context detection (requires embedding app in Teams)
+- Meeting transcript ingestion via Microsoft Graph API
+- Required Graph permissions: `OnlineMeetingTranscript.Read.All`, `OnlineMeetings.Read`
+- Azure AD app registration with proper RSC permissions
+- Teams app manifest for embedding in meeting side panel
+
+### How to test
+- **Standalone**: Select Teams mode, enable "Demo Context" to simulate Teams metadata
+- **Inject transcripts**: Use the sidebar transcript injection tool during a Teams session
+- **In Teams**: Deploy as a Teams tab app with proper Azure AD registration
+
+### Architecture boundary
+The coaching engine is completely unaware of transcript source. All three modes emit the same `TranscriptChunk` shape through WebSocket, keeping the coaching/scoring pipeline mode-agnostic.
 
 ## Running
 - `npm run dev` starts both Express backend and Vite frontend

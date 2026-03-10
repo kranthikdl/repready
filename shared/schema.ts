@@ -12,15 +12,48 @@ export type PromptCategory = typeof promptCategories[number];
 export const severityLevels = ["low", "medium", "high"] as const;
 export type Severity = typeof severityLevels[number];
 
+export const sessionModes = ["simulation", "live", "teams"] as const;
+export type SessionMode = typeof sessionModes[number];
+
 export const sessionConfigSchema = z.object({
   sdrName: z.string().min(1),
   callType: z.enum(callTypes),
   coachingPriorities: z.array(z.enum(coachingPriorities)).min(1),
   talkTrackNotes: z.string().optional(),
-  mode: z.enum(["simulation", "live"]),
+  mode: z.enum(sessionModes),
+  teamsContext: z.object({
+    meetingId: z.string().optional(),
+    meetingTitle: z.string().optional(),
+    userDisplayName: z.string().optional(),
+    tenantId: z.string().optional(),
+    conversationId: z.string().optional(),
+    isInTeams: z.boolean(),
+    demoContext: z.boolean().optional(),
+  }).optional(),
 });
 
 export type SessionConfig = z.infer<typeof sessionConfigSchema>;
+
+export interface TeamsContext {
+  meetingId?: string;
+  meetingTitle?: string;
+  userDisplayName?: string;
+  tenantId?: string;
+  conversationId?: string;
+  isInTeams: boolean;
+  demoContext?: boolean;
+}
+
+export type TeamsSDKStatus = "not_loaded" | "loading" | "loaded" | "failed";
+export type TeamsContextStatus = "unknown" | "detected" | "not_in_teams" | "demo_mode";
+export type TeamsTranscriptStatus = "unavailable" | "scaffolded" | "demo_injection";
+
+export interface TeamsStatusInfo {
+  sdkStatus: TeamsSDKStatus;
+  contextStatus: TeamsContextStatus;
+  transcriptStatus: TeamsTranscriptStatus;
+  context: TeamsContext | null;
+}
 
 export interface TranscriptChunk {
   id: string;

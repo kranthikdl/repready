@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Zap, Clock, User, Phone, Download } from "lucide-react";
+import { ArrowLeft, Zap, Clock, User, Phone, Download, Monitor } from "lucide-react";
 import Scorecard from "@/components/Scorecard";
 import SummaryView from "@/components/SummaryView";
 import TranscriptPanel from "@/components/TranscriptPanel";
@@ -110,7 +110,23 @@ export default function SessionReview() {
                   {priorityLabels[p]}
                 </Badge>
               ))}
+              {session.config.mode === "teams" && (
+                <Badge variant="secondary" className="text-xs no-default-active-elevate">
+                  <Monitor className="w-3 h-3 mr-1" />
+                  Teams
+                </Badge>
+              )}
             </div>
+            {session.config.teamsContext && (
+              <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground flex-wrap" data-testid="text-teams-metadata">
+                {session.config.teamsContext.meetingTitle && (
+                  <span>Meeting: {session.config.teamsContext.meetingTitle}</span>
+                )}
+                {session.config.teamsContext.demoContext && (
+                  <Badge variant="outline" className="text-xs no-default-active-elevate">Demo Context</Badge>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
