@@ -22,7 +22,16 @@ interface ActiveSession {
 const activeSessions = new Map<string, ActiveSession>();
 
 export function setupWebSocket(server: Server) {
-  const wss = new WebSocketServer({ server, path: "/ws" });
+  const wss = new WebSocketServer({ noServer: true });
+
+  server.on("upgrade", (req, socket, head) => {
+    const pathname = req.url ? new URL(req.url, "http://localhost").pathname : "";
+    if (pathname === "/ws") {
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        wss.emit("connection", ws, req);
+      });
+    }
+  });
 
   wss.on("connection", (ws) => {
     log("WebSocket client connected", "ws");

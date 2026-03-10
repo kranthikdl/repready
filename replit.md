@@ -70,7 +70,9 @@ The coaching engine is completely unaware of transcript source. All three modes 
 
 ## Running
 - `npm run dev` starts both Express backend and Vite frontend
-- WebSocket server runs on the same port at `/ws`
+- WebSocket server runs on the same port at `/ws` using `noServer` mode with manual upgrade handling
+- Vite HMR WebSocket runs on `/vite-hmr` with `clientPort: 443` for Replit proxy compatibility
+- The `@replit/vite-plugin-runtime-error-modal` plugin was removed from `vite.config.ts` to prevent false-positive error overlays from HMR connection events
 
 ## Customizing Coaching Rules
 - Edit `server/services/rulesEngine.ts` to modify detection heuristics
