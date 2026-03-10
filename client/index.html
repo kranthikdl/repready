@@ -12,20 +12,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script>
-      window.addEventListener("error", function(e) {
-        if (e && e.message && (e.message.indexOf("websocket") !== -1 || e.message.indexOf("WebSocket") !== -1 || e.message.indexOf("vite") !== -1 || (e.filename && e.filename.indexOf("@vite/client") !== -1))) {
-          e.stopImmediatePropagation();
-          e.preventDefault();
-        }
-      }, true);
-      window.addEventListener("unhandledrejection", function(e) {
-        if (e && e.reason && typeof e.reason === "object" && e.reason.message && (e.reason.message.indexOf("websocket") !== -1 || e.reason.message.indexOf("WebSocket") !== -1)) {
-          e.stopImmediatePropagation();
-          e.preventDefault();
-        }
-      }, true);
-    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
