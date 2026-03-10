@@ -1,6 +1,8 @@
 import { randomUUID } from "crypto";
 import type { TranscriptChunk, CoachingPrompt, CoachingPriority, SessionConfig } from "@shared/schema";
 import { evaluateRules } from "./rulesEngine";
+import { evaluateCoachingWithLLM } from "./llmService";
+import { log } from "../index";
 
 interface CooldownState {
   lastPromptTime: number;
@@ -37,12 +39,13 @@ export class CoachingEngine {
     lastPromptTime: 0,
     recentCategories: new Map(),
   };
+  private pendingLLMCall = false;
 
-  evaluateAndGenerate(
+  async evaluateAndGenerate(
     transcript: TranscriptChunk[],
     config: SessionConfig,
     sessionStartTime: number
-  ): CoachingPrompt | null {
+  ): Promise<CoachingPrompt | null> {
     const ruleCandidate = evaluateRules(transcript, config.coachingPriorities);
     if (!ruleCandidate) return null;
 
@@ -59,22 +62,71 @@ export class CoachingEngine {
       return null;
     }
 
-    const responses = mockCoachingResponses[ruleCandidate.category] || [];
-    const response = responses[Math.floor(Math.random() * responses.length)];
+    if (this.pendingLLMCall) return null;
+
+    let title: string;
+    let message: string;
+    let severity = ruleCandidate.severity;
+    let reason = ruleCandidate.reason;
+    let category = ruleCandidate.category;
+
+    if (process.env.OPENAI_API_KEY) {
+      this.pendingLLMCall = true;
+      try {
+        const llmResult = await evaluateCoachingWithLLM(
+          transcript,
+          ruleCandidate.category,
+          ruleCandidate.reason,
+          config
+        );
+
+        if (llmResult && llmResult.firePrompt) {
+          title = llmResult.title;
+          message = llmResult.message;
+          severity = llmResult.severity;
+          reason = llmResult.reason;
+          category = llmResult.category;
+          log(`LLM coaching: "${title}" [${severity}]`, "coaching");
+        } else if (llmResult && !llmResult.firePrompt) {
+          this.pendingLLMCall = false;
+          log("LLM decided not to fire prompt", "coaching");
+          return null;
+        } else {
+          const responses = mockCoachingResponses[ruleCandidate.category] || [];
+          const response = responses[Math.floor(Math.random() * responses.length)];
+          title = response?.title || "Coaching moment detected";
+          message = response?.message || "Consider adjusting your approach.";
+          log("LLM unavailable, using fallback response", "coaching");
+        }
+      } catch (err) {
+        const responses = mockCoachingResponses[ruleCandidate.category] || [];
+        const response = responses[Math.floor(Math.random() * responses.length)];
+        title = response?.title || "Coaching moment detected";
+        message = response?.message || "Consider adjusting your approach.";
+        log(`LLM error, using fallback: ${err}`, "coaching");
+      } finally {
+        this.pendingLLMCall = false;
+      }
+    } else {
+      const responses = mockCoachingResponses[ruleCandidate.category] || [];
+      const response = responses[Math.floor(Math.random() * responses.length)];
+      title = response?.title || "Coaching moment detected";
+      message = response?.message || "Consider adjusting your approach.";
+    }
 
     const prompt: CoachingPrompt = {
       id: randomUUID(),
-      category: ruleCandidate.category,
-      title: response?.title || "Coaching moment detected",
-      message: response?.message || "Consider adjusting your approach.",
-      severity: ruleCandidate.severity,
-      timestamp: now,
-      sessionTime: now - sessionStartTime,
-      reason: ruleCandidate.reason,
+      category,
+      title,
+      message,
+      severity,
+      timestamp: Date.now(),
+      sessionTime: Date.now() - sessionStartTime,
+      reason,
     };
 
-    this.cooldownState.lastPromptTime = now;
-    this.cooldownState.recentCategories.set(ruleCandidate.category, now);
+    this.cooldownState.lastPromptTime = Date.now();
+    this.cooldownState.recentCategories.set(category, Date.now());
 
     return prompt;
   }
@@ -84,5 +136,6 @@ export class CoachingEngine {
       lastPromptTime: 0,
       recentCategories: new Map(),
     };
+    this.pendingLLMCall = false;
   }
 }

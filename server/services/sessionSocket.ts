@@ -5,6 +5,7 @@ import { sessionStorage } from "./storageService";
 import { CoachingEngine } from "./coachingEngine";
 import { getSimulationScript } from "./simulationService";
 import { generateMockSummary } from "./summaryService";
+import { generateSummaryWithLLM } from "./llmService";
 import type { TranscriptChunk, SessionConfig } from "@shared/schema";
 import { sessionConfigSchema } from "@shared/schema";
 import { log } from "../index";
@@ -122,19 +123,9 @@ async function handleMessage(
       };
 
       sessionStorage.addTranscriptChunk(currentSessionId, chunk);
-
       ws.send(JSON.stringify({ type: "transcript_update", chunk }));
 
-      const prompt = active.coachingEngine.evaluateAndGenerate(
-        session.transcript,
-        active.config,
-        session.startedAt
-      );
-
-      if (prompt) {
-        sessionStorage.addCoachingPrompt(currentSessionId, prompt);
-        ws.send(JSON.stringify({ type: "coaching_prompt", prompt }));
-      }
+      evaluateCoachingAsync(active, session, currentSessionId);
 
       return null;
     }
@@ -149,11 +140,31 @@ async function handleMessage(
       const session = sessionStorage.getSession(currentSessionId);
       if (!session) return null;
 
-      const summary = generateMockSummary(
-        session.transcript,
-        session.coachingPrompts,
-        active.config
-      );
+      ws.send(JSON.stringify({ type: "generating_summary" }));
+
+      let summary = null;
+      if (process.env.OPENAI_API_KEY) {
+        log("Generating LLM summary...", "coaching");
+        summary = await generateSummaryWithLLM(
+          session.transcript,
+          session.coachingPrompts.map((p) => ({
+            category: p.category,
+            title: p.title,
+            severity: p.severity,
+            reason: p.reason,
+          })),
+          active.config
+        );
+      }
+
+      if (!summary) {
+        log("Using fallback mock summary", "coaching");
+        summary = generateMockSummary(
+          session.transcript,
+          session.coachingPrompts,
+          active.config
+        );
+      }
 
       const completed = sessionStorage.endSession(currentSessionId, summary);
 
@@ -171,6 +182,29 @@ async function handleMessage(
     default:
       ws.send(JSON.stringify({ type: "error", message: `Unknown message type: ${message.type}` }));
       return null;
+  }
+}
+
+async function evaluateCoachingAsync(
+  active: ActiveSession,
+  session: ReturnType<typeof sessionStorage.getSession> & {},
+  sessionId: string
+) {
+  try {
+    const prompt = await active.coachingEngine.evaluateAndGenerate(
+      session.transcript,
+      active.config,
+      session.startedAt
+    );
+
+    if (prompt) {
+      sessionStorage.addCoachingPrompt(sessionId, prompt);
+      if (active.ws.readyState === WebSocket.OPEN) {
+        active.ws.send(JSON.stringify({ type: "coaching_prompt", prompt }));
+      }
+    }
+  } catch (err) {
+    log(`Coaching evaluation error: ${err}`, "coaching");
   }
 }
 
@@ -199,16 +233,7 @@ function startSimulation(sessionId: string) {
     sessionStorage.addTranscriptChunk(sessionId, chunk);
     a.ws.send(JSON.stringify({ type: "transcript_update", chunk }));
 
-    const prompt = a.coachingEngine.evaluateAndGenerate(
-      session.transcript,
-      a.config,
-      session.startedAt
-    );
-
-    if (prompt) {
-      sessionStorage.addCoachingPrompt(sessionId, prompt);
-      a.ws.send(JSON.stringify({ type: "coaching_prompt", prompt }));
-    }
+    evaluateCoachingAsync(a, session, sessionId);
 
     a.simulationIndex++;
 

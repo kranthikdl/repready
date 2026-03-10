@@ -34,6 +34,7 @@ export default function LiveSession() {
   const [simulationComplete, setSimulationComplete] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [connectionError, setConnectionError] = useState(false);
+  const [generatingSummary, setGeneratingSummary] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -95,8 +96,13 @@ export default function LiveSession() {
         setSimulationComplete(true);
       });
 
+      socketClient.on("generating_summary", () => {
+        setGeneratingSummary(true);
+      });
+
       socketClient.on("session_ended", (data) => {
         if (timerRef.current) clearInterval(timerRef.current);
+        setGeneratingSummary(false);
         navigate(`/review/${data.session.id}`);
       });
 
@@ -200,10 +206,10 @@ export default function LiveSession() {
             variant="destructive"
             size="sm"
             onClick={handleEndSession}
-            disabled={isEnding}
+            disabled={isEnding || generatingSummary}
           >
             <Square className="w-3 h-3 mr-1.5" />
-            {isEnding ? "Ending..." : "End Session"}
+            {generatingSummary ? "Generating Summary..." : isEnding ? "Ending..." : "End Session"}
           </Button>
         </div>
       </header>
