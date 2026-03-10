@@ -17,8 +17,8 @@ import type { TeamsContext, TeamsSDKStatus, TeamsContextStatus, TeamsTranscriptS
  *   - Install @microsoft/teams-js SDK
  *   - Azure AD app registration
  *   - Teams app manifest for meeting side panel embedding
- *   - Replace initialize() stub with real SDK init: microsoftTeams.app.initialize()
- *   - Replace detectContext() stub with real context: microsoftTeams.app.getContext()
+ *   - Replace initialize() stub with real SDK init
+ *   - Replace detectContext() stub with real context detection
  *
  * Layer 3 (requires Graph API permissions):
  *   - OnlineMeetingTranscript.Read.All (application permission)
@@ -45,8 +45,13 @@ class TeamsIntegrationService {
   private teamsContext: TeamsContext | null = null;
   private listeners: Set<() => void> = new Set();
   private demoMode = false;
+  private cachedStatus: TeamsStatusInfo;
 
-  getStatus(): TeamsStatusInfo {
+  constructor() {
+    this.cachedStatus = this.buildStatus();
+  }
+
+  private buildStatus(): TeamsStatusInfo {
     return {
       sdkStatus: this.sdkStatus,
       contextStatus: this.contextStatus,
@@ -55,34 +60,18 @@ class TeamsIntegrationService {
     };
   }
 
+  getStatus(): TeamsStatusInfo {
+    return this.cachedStatus;
+  }
+
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
 
   private notify() {
+    this.cachedStatus = this.buildStatus();
     this.listeners.forEach((fn) => fn());
-  }
-
-  async initialize(): Promise<void> {
-    this.sdkStatus = "loading";
-    this.notify();
-
-    /*
-     * SCAFFOLD: In a real Teams deployment, this would:
-     *   1. Import @microsoft/teams-js dynamically
-     *   2. Call microsoftTeams.app.initialize()
-     *   3. Call microsoftTeams.app.getContext() to detect meeting context
-     *
-     * Since we're running standalone (no Teams SDK installed), we report
-     * "not in Teams" and allow demo mode for architecture demonstration.
-     */
-    await new Promise((r) => setTimeout(r, 300));
-
-    this.sdkStatus = "failed";
-    this.contextStatus = "not_in_teams";
-    this.transcriptStatus = "unavailable";
-    this.notify();
   }
 
   enableDemoMode(): void {
@@ -111,14 +100,6 @@ class TeamsIntegrationService {
     return this.teamsContext;
   }
 
-  /*
-   * Inject a transcript event manually (for demo/testing).
-   *
-   * In a production Teams integration, transcript events would come from:
-   * - Microsoft Graph API subscription to meeting transcripts
-   * - Teams Bot Framework media platform for real-time audio
-   * - Teams meeting transcript webhook notifications
-   */
   injectTranscriptEvent(
     text: string,
     speaker: "rep" | "prospect"
