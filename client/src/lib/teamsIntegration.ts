@@ -1,4 +1,3 @@
-import * as microsoftTeams from "@microsoft/teams-js";
 import type { TeamsContext, TeamsSDKStatus, TeamsContextStatus, TeamsTranscriptStatus, TeamsStatusInfo } from "@shared/schema";
 
 const DEMO_TEAMS_CONTEXT: TeamsContext = {
@@ -10,6 +9,18 @@ const DEMO_TEAMS_CONTEXT: TeamsContext = {
   isInTeams: false,
   demoContext: true,
 };
+
+let teamsSDK: typeof import("@microsoft/teams-js") | null = null;
+
+async function loadTeamsSDK() {
+  if (teamsSDK) return teamsSDK;
+  try {
+    teamsSDK = await import("@microsoft/teams-js");
+    return teamsSDK;
+  } catch {
+    return null;
+  }
+}
 
 class TeamsIntegrationService {
   private sdkStatus: TeamsSDKStatus = "not_loaded";
@@ -42,11 +53,15 @@ class TeamsIntegrationService {
     this.notify();
 
     try {
-      await microsoftTeams.app.initialize();
+      const sdk = await loadTeamsSDK();
+      if (!sdk) {
+        throw new Error("Failed to load Teams SDK");
+      }
+      await sdk.app.initialize();
       this.sdkStatus = "loaded";
       this.notify();
 
-      await this.detectContext();
+      await this.detectContext(sdk);
     } catch (err) {
       this.sdkStatus = "failed";
       this.contextStatus = "not_in_teams";
@@ -55,9 +70,9 @@ class TeamsIntegrationService {
     }
   }
 
-  private async detectContext(): Promise<void> {
+  private async detectContext(sdk: typeof import("@microsoft/teams-js")): Promise<void> {
     try {
-      const context = await microsoftTeams.app.getContext();
+      const context = await sdk.app.getContext();
 
       this.teamsContext = {
         meetingId: context.meeting?.id,
