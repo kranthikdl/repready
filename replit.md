@@ -1,7 +1,7 @@
 # RepReady - Real-time SDR Coaching Demo
 
 ## Overview
-RepReady is a real-time AI coaching demo for SDR readiness. It supports simulated, live, and Microsoft Teams-integrated sales calls, detects coaching-relevant moments, surfaces short coaching prompts during the session, and generates a post-call summary with a readiness scorecard.
+RepReady is a real-time AI coaching demo for SDR readiness. It supports simulated and live sales calls, detects coaching-relevant moments, surfaces short coaching prompts during the session, and generates a post-call summary with a readiness scorecard. Microsoft Teams is available as a scaffolded integration surface.
 
 ## Architecture
 - **Frontend**: React + Vite + TypeScript + Tailwind + shadcn/ui
@@ -25,7 +25,7 @@ RepReady is a real-time AI coaching demo for SDR readiness. It supports simulate
 - `client/src/pages/SessionReview.tsx` - Post-call review with tabs
 - `client/src/pages/PreviousSessions.tsx` - Session history list
 - `client/src/lib/socket.ts` - WebSocket client wrapper
-- `client/src/lib/teamsIntegration.ts` - Microsoft Teams SDK integration service
+- `client/src/lib/teamsIntegration.ts` - Scaffolded Teams integration service (no SDK dependency)
 - `client/src/components/TeamsStatusCard.tsx` - Teams status display component
 
 ## LLM Integration
@@ -37,30 +37,33 @@ RepReady is a real-time AI coaching demo for SDR readiness. It supports simulate
 ## Modes
 1. **Simulation Mode** - Uses scripted transcripts that stream automatically
 2. **Live Mode** - Browser microphone capture (requires transcription API setup)
-3. **Teams Mode** - Microsoft Teams integration surface with context detection, meeting metadata capture, and transcript injection
+3. **Teams Mode** (scaffolded) - Architecture-ready integration surface for Microsoft Teams
 
-## Microsoft Teams Integration
+## Microsoft Teams Integration (Scaffolded)
+Teams mode is a scaffolded integration surface — the UI, types, and architecture are in place
+but the actual Microsoft Teams JS SDK is not installed. No external dependencies are required.
+
 ### What works now
 - Teams mode selectable in session setup with dedicated UI
-- Microsoft Teams JS SDK initialization and context detection
-- Teams status card showing SDK, context, and transcript availability
-- Demo Teams Context toggle for local/standalone testing
+- Demo Teams Context toggle for architecture demonstration
 - Manual transcript event injection during Teams sessions
 - Teams meeting metadata (title, ID, user) attached to session artifacts
 - Teams metadata displayed in session review
-- Graceful fallback to simulation or live mode when not in Teams
+- Status card showing integration state
+- Fallback buttons to switch to Simulation or Live mode
 
-### What is scaffolded (requires Microsoft setup)
-- Real Teams meeting context detection (requires embedding app in Teams)
-- Meeting transcript ingestion via Microsoft Graph API
-- Required Graph permissions: `OnlineMeetingTranscript.Read.All`, `OnlineMeetings.Read`
-- Azure AD app registration with proper RSC permissions
-- Teams app manifest for embedding in meeting side panel
+### What would be needed for production Teams integration
+1. Install `@microsoft/teams-js` SDK
+2. Azure AD app registration
+3. Teams app manifest for meeting side panel embedding
+4. Microsoft Graph API permissions: `OnlineMeetingTranscript.Read.All`, `OnlineMeetings.Read`
+5. Admin consent for tenant-wide transcript access
+6. Replace scaffolded `initialize()` in `teamsIntegration.ts` with real SDK calls
 
 ### How to test
-- **Standalone**: Select Teams mode, enable "Demo Context" to simulate Teams metadata
-- **Inject transcripts**: Use the sidebar transcript injection tool during a Teams session
-- **In Teams**: Deploy as a Teams tab app with proper Azure AD registration
+- Select Teams mode, enable "Demo Context" to preview the integration surface
+- Use the sidebar transcript injection tool during a Teams session
+- The coaching engine processes injected transcripts identically to simulation/live
 
 ### Architecture boundary
 The coaching engine is completely unaware of transcript source. All three modes emit the same `TranscriptChunk` shape through WebSocket, keeping the coaching/scoring pipeline mode-agnostic.

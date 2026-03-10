@@ -1,5 +1,33 @@
 import type { TeamsContext, TeamsSDKStatus, TeamsContextStatus, TeamsTranscriptStatus, TeamsStatusInfo } from "@shared/schema";
 
+/*
+ * TeamsIntegrationService — Scaffolded Integration Surface
+ *
+ * This service provides the architecture for Microsoft Teams integration
+ * without depending on the actual Teams JS SDK at runtime. The integration
+ * is designed in progressive layers:
+ *
+ * Layer 1 (scaffolded here):
+ *   - Teams mode as a session type
+ *   - Demo context for architecture demonstration
+ *   - Manual transcript injection pipeline
+ *   - Status reporting UI
+ *
+ * Layer 2 (requires Microsoft setup):
+ *   - Install @microsoft/teams-js SDK
+ *   - Azure AD app registration
+ *   - Teams app manifest for meeting side panel embedding
+ *   - Replace initialize() stub with real SDK init: microsoftTeams.app.initialize()
+ *   - Replace detectContext() stub with real context: microsoftTeams.app.getContext()
+ *
+ * Layer 3 (requires Graph API permissions):
+ *   - OnlineMeetingTranscript.Read.All (application permission)
+ *   - OnlineMeetings.Read (delegated permission)
+ *   - Graph endpoint: GET /me/onlineMeetings/{meetingId}/transcripts
+ *   - Admin consent for tenant-wide transcript access
+ *   - Replace transcript stub with real Graph API subscription
+ */
+
 const DEMO_TEAMS_CONTEXT: TeamsContext = {
   meetingId: "demo-meeting-19:meeting_MjZhYjZiNj@thread.v2",
   meetingTitle: "Q3 Pipeline Review - Acme Corp",
@@ -9,18 +37,6 @@ const DEMO_TEAMS_CONTEXT: TeamsContext = {
   isInTeams: false,
   demoContext: true,
 };
-
-let teamsSDK: typeof import("@microsoft/teams-js") | null = null;
-
-async function loadTeamsSDK() {
-  if (teamsSDK) return teamsSDK;
-  try {
-    teamsSDK = await import("@microsoft/teams-js");
-    return teamsSDK;
-  } catch {
-    return null;
-  }
-}
 
 class TeamsIntegrationService {
   private sdkStatus: TeamsSDKStatus = "not_loaded";
@@ -52,57 +68,20 @@ class TeamsIntegrationService {
     this.sdkStatus = "loading";
     this.notify();
 
-    try {
-      const sdk = await loadTeamsSDK();
-      if (!sdk) {
-        throw new Error("Failed to load Teams SDK");
-      }
-      await sdk.app.initialize();
-      this.sdkStatus = "loaded";
-      this.notify();
+    /*
+     * SCAFFOLD: In a real Teams deployment, this would:
+     *   1. Import @microsoft/teams-js dynamically
+     *   2. Call microsoftTeams.app.initialize()
+     *   3. Call microsoftTeams.app.getContext() to detect meeting context
+     *
+     * Since we're running standalone (no Teams SDK installed), we report
+     * "not in Teams" and allow demo mode for architecture demonstration.
+     */
+    await new Promise((r) => setTimeout(r, 300));
 
-      await this.detectContext(sdk);
-    } catch (err) {
-      this.sdkStatus = "failed";
-      this.contextStatus = "not_in_teams";
-      this.transcriptStatus = "unavailable";
-      this.notify();
-    }
-  }
-
-  private async detectContext(sdk: typeof import("@microsoft/teams-js")): Promise<void> {
-    try {
-      const context = await sdk.app.getContext();
-
-      this.teamsContext = {
-        meetingId: context.meeting?.id,
-        meetingTitle: (context.page as any)?.subPageId || undefined,
-        userDisplayName: context.user?.displayName,
-        tenantId: context.user?.tenant?.id,
-        conversationId: (context.chat as any)?.id || undefined,
-        isInTeams: true,
-        demoContext: false,
-      };
-
-      this.contextStatus = "detected";
-
-      /*
-       * Teams meeting transcript access requires:
-       * - Microsoft Graph API permissions: OnlineMeetingTranscript.Read.All
-       * - Azure AD app registration with proper consent
-       * - The meeting must have transcription enabled
-       * - Graph endpoint: GET /me/onlineMeetings/{meetingId}/transcripts
-       *
-       * This is not available in a standalone browser context.
-       * The transcript status remains "scaffolded" to indicate the architecture
-       * is ready but the actual Graph API integration requires proper Azure setup.
-       */
-      this.transcriptStatus = "scaffolded";
-    } catch {
-      this.contextStatus = "not_in_teams";
-      this.transcriptStatus = "unavailable";
-    }
-
+    this.sdkStatus = "failed";
+    this.contextStatus = "not_in_teams";
+    this.transcriptStatus = "unavailable";
     this.notify();
   }
 
@@ -133,20 +112,12 @@ class TeamsIntegrationService {
   }
 
   /*
-   * Inject a transcript event manually (for demo/testing purposes).
+   * Inject a transcript event manually (for demo/testing).
+   *
    * In a production Teams integration, transcript events would come from:
    * - Microsoft Graph API subscription to meeting transcripts
    * - Teams Bot Framework media platform for real-time audio
    * - Teams meeting transcript webhook notifications
-   *
-   * Required Microsoft Graph permissions for real transcript access:
-   * - OnlineMeetingTranscript.Read.All (application)
-   * - OnlineMeetings.Read (delegated)
-   *
-   * Required Azure AD configuration:
-   * - App registration in Azure portal
-   * - Teams app manifest with proper RSC permissions
-   * - Admin consent for tenant-wide transcript access
    */
   injectTranscriptEvent(
     text: string,

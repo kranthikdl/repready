@@ -1,4 +1,4 @@
-import { useState, useEffect, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useLocation, Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Zap, Mic, Play, ChevronRight, Radio, History, Monitor, AlertTriangle } from "lucide-react";
 import type { CallType, CoachingPriority, SessionConfig, SessionMode } from "@shared/schema";
 import { callTypeLabels, priorityLabels } from "@shared/schema";
@@ -17,7 +16,7 @@ import TeamsStatusCard from "@/components/TeamsStatusCard";
 const modeOptions: { value: SessionMode; label: string; icon: typeof Play; desc: string }[] = [
   { value: "simulation", label: "Simulation", icon: Play, desc: "Scripted transcript for demo" },
   { value: "live", label: "Live", icon: Mic, desc: "Browser microphone capture" },
-  { value: "teams", label: "Teams", icon: Monitor, desc: "Microsoft Teams meeting context" },
+  { value: "teams", label: "Teams", icon: Monitor, desc: "Teams integration (scaffolded)" },
 ];
 
 export default function SessionSetup() {
@@ -33,12 +32,6 @@ export default function SessionSetup() {
     (cb) => teamsService.subscribe(cb),
     () => teamsService.getStatus()
   );
-
-  useEffect(() => {
-    if (mode === "teams" && teamsStatus.sdkStatus === "not_loaded") {
-      teamsService.initialize();
-    }
-  }, [mode, teamsStatus.sdkStatus]);
 
   const togglePriority = (p: CoachingPriority) => {
     setPriorities((prev) =>
@@ -197,14 +190,14 @@ export default function SessionSetup() {
               <div className="space-y-3">
                 <TeamsStatusCard status={teamsStatus} />
 
-                {teamsStatus.contextStatus === "not_in_teams" && teamsStatus.sdkStatus !== "not_loaded" && !demoTeamsContext && (
+                {!demoTeamsContext && (
                   <div className="rounded-md bg-muted/50 p-3 space-y-2">
                     <div className="flex items-start gap-2">
                       <AlertTriangle className="w-4 h-4 text-yellow-500 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
                       <div>
-                        <p className="text-sm font-medium">Not running inside Teams</p>
+                        <p className="text-sm font-medium">Scaffolded Integration</p>
                         <p className="text-xs text-muted-foreground">
-                          The app is not embedded in a Microsoft Teams context. You can enable a demo context to preview the Teams integration, or switch to Simulation or Live mode.
+                          Teams mode is scaffolded for architecture demonstration. Enable a demo context to preview the integration surface, or use Simulation/Live mode for a full session.
                         </p>
                       </div>
                     </div>
@@ -235,11 +228,6 @@ export default function SessionSetup() {
                   </div>
                 )}
 
-                {teamsStatus.sdkStatus === "not_loaded" && (
-                  <p className="text-xs text-muted-foreground">
-                    Teams SDK will initialize when you select Teams mode.
-                  </p>
-                )}
               </div>
             )}
 
