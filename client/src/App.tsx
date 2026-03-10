@@ -4,13 +4,18 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
+import SessionSetup from "@/pages/SessionSetup";
+import LiveSession from "@/pages/LiveSession";
+import SessionReview from "@/pages/SessionReview";
+import PreviousSessions from "@/pages/PreviousSessions";
 
 function Router() {
   return (
     <Switch>
-      {/* Add pages below */}
-      {/* <Route path="/" component={Home}/> */}
-      {/* Fallback to 404 */}
+      <Route path="/" component={SessionSetup} />
+      <Route path="/session" component={LiveSession} />
+      <Route path="/review/:id" component={SessionReview} />
+      <Route path="/sessions" component={PreviousSessions} />
       <Route component={NotFound} />
     </Switch>
   );
