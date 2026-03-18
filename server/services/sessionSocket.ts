@@ -174,21 +174,13 @@ async function handleMessage(
 
       let summary = null;
 
-      if (session.transcript.length === 0) {
-        log("Empty transcript — skipping LLM summary generation", "coaching");
-        summary = {
-          callOverview: "No transcript captured — session too short to score.",
-          whatWentWell: [],
-          missedOpportunities: [],
-          recommendedCoachingActions: ["Record a session with more transcript data to receive coaching feedback."],
-          nextStepQualityAssessment: "No transcript was captured during this session.",
-          scorecard: {
-            discovery: 0,
-            objectionHandling: 0,
-            nextStepDiscipline: 0,
-            overallReadiness: 0,
-          },
-        };
+      const MIN_SESSION_MS = 5 * 60 * 1000; // 5 minutes minimum
+      const sessionDuration = Date.now() - session.startedAt;
+      const hasEnoughData = session.transcript.length > 0 && sessionDuration >= MIN_SESSION_MS;
+
+      if (!hasEnoughData) {
+        log(`Insufficient data for scoring (${Math.round(sessionDuration / 1000)}s, ${session.transcript.length} chunks) — skipping summary generation`, "coaching");
+        // summary stays null — UI will show "Not enough data to score"
       } else if (process.env.OPENAI_API_KEY) {
         log("Generating LLM summary...", "coaching");
         summary = await generateSummaryWithLLM(
@@ -202,10 +194,16 @@ async function handleMessage(
           active.config,
           active.profile
         );
-      }
-
-      if (!summary) {
-        log("Using fallback mock summary", "coaching");
+        if (!summary) {
+          log("Using fallback mock summary", "coaching");
+          summary = generateMockSummary(
+            session.transcript,
+            session.coachingPrompts,
+            active.config
+          );
+        }
+      } else {
+        log("Using fallback mock summary (no API key)", "coaching");
         summary = generateMockSummary(
           session.transcript,
           session.coachingPrompts,

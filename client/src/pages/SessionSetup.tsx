@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Zap, Mic, Play, ChevronRight, Radio, History, Monitor, AlertTriangle, Settings } from "lucide-react";
+import { Zap, Play, ChevronRight, Radio, History, Monitor, AlertTriangle, Settings, Link2 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { CallType, CoachingPriority, SessionConfig, SessionMode } from "@shared/schema";
 import { callTypeLabels, priorityLabels } from "@shared/schema";
 import { teamsService } from "@/lib/teamsIntegration";
@@ -15,8 +16,7 @@ import TeamsStatusCard from "@/components/TeamsStatusCard";
 
 const modeOptions: { value: SessionMode; label: string; icon: typeof Play; desc: string }[] = [
   { value: "simulation", label: "Simulation", icon: Play, desc: "Scripted transcript for demo" },
-  { value: "live", label: "Live", icon: Mic, desc: "Browser microphone capture" },
-  { value: "teams", label: "Teams", icon: Monitor, desc: "Teams integration (scaffolded)" },
+  { value: "teams", label: "Live", icon: Monitor, desc: "Teams" },
 ];
 
 export default function SessionSetup() {
@@ -191,6 +191,26 @@ export default function SessionSetup() {
                     </button>
                   );
                 })}
+
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        data-testid="button-mode-hubspot"
+                        className="relative flex flex-col items-center gap-1.5 rounded-md p-3 text-center bg-muted/50 opacity-60 cursor-not-allowed"
+                        disabled
+                      >
+                        <Link2 className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-xs font-medium">HubSpot</span>
+                        <span className="text-xs text-muted-foreground leading-tight">CRM Integration</span>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Coming Soon</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             </div>
 
@@ -215,9 +235,6 @@ export default function SessionSetup() {
                       </Button>
                       <Button variant="ghost" size="sm" onClick={() => setMode("simulation")} data-testid="button-fallback-simulation">
                         Use Simulation
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => setMode("live")} data-testid="button-fallback-live">
-                        Use Live Mic
                       </Button>
                     </div>
                   </div>
