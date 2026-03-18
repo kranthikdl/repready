@@ -1,4 +1,3 @@
-import express from "express";
 import type { Express } from "express";
 import { type Server } from "http";
 import { sessionStorage } from "./services/storageService";
@@ -33,25 +32,21 @@ export async function registerRoutes(
     res.json({ message: "Session deleted" });
   });
 
-  app.post(
-    "/api/transcribe",
-    express.raw({ type: "*/*", limit: "10mb" }),
-    async (req, res) => {
-      const audioBuffer = req.body as Buffer;
-      if (!audioBuffer || audioBuffer.length === 0) {
-        return res.status(400).json({ message: "No audio data received" });
-      }
-
-      const mimeType = req.headers["content-type"] || "audio/webm";
-      const text = await transcribeAudio(audioBuffer, mimeType);
-
-      if (text === null) {
-        return res.status(500).json({ message: "Transcription service error. Check your OpenAI API key." });
-      }
-
-      res.json({ text });
+  app.post("/api/transcribe", async (req, res) => {
+    const { audio, mimeType } = req.body as { audio?: string; mimeType?: string };
+    if (!audio) {
+      return res.status(400).json({ message: "No audio data received" });
     }
-  );
+    const audioBuffer = Buffer.from(audio, "base64");
+    if (audioBuffer.length === 0) {
+      return res.status(400).json({ message: "Empty audio data" });
+    }
+    const text = await transcribeAudio(audioBuffer, mimeType || "audio/webm");
+    if (text === null) {
+      return res.status(500).json({ message: "Transcription service error. Check your OpenAI API key." });
+    }
+    res.json({ text });
+  });
 
   return httpServer;
 }

@@ -47,10 +47,16 @@ function TeamsSidebarSection() {
     setProcessingCount((c) => c + 1);
     try {
       const mimeType = blob.type || "audio/webm";
+      const arrayBuffer = await blob.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = "";
+      for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+      const audio = btoa(binary);
+
       const res = await fetch("/api/transcribe", {
         method: "POST",
-        headers: { "Content-Type": mimeType },
-        body: blob,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ audio, mimeType }),
       });
       if (!res.ok) {
         console.warn("[transcribe] chunk rejected:", res.status);
@@ -64,8 +70,8 @@ function TeamsSidebarSection() {
           text: text.trim(),
         });
       }
-    } catch {
-      console.warn("[transcribe] chunk failed, will retry on next cycle");
+    } catch (err) {
+      console.warn("[transcribe] chunk failed:", err);
     } finally {
       setProcessingCount((c) => Math.max(0, c - 1));
     }
