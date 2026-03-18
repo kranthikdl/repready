@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Square, Clock, Zap, Play, Mic, User, Phone, Monitor, Send } from "lucide-react";
+import { Square, Clock, Zap, Play, Mic, MicOff, User, Phone, Monitor, Send, Radio } from "lucide-react";
 import { socketClient } from "@/lib/socket";
 import { teamsService } from "@/lib/teamsIntegration";
 import TranscriptPanel from "@/components/TranscriptPanel";
@@ -14,6 +14,13 @@ import CoachingPanel from "@/components/CoachingPanel";
 import TeamsStatusCard from "@/components/TeamsStatusCard";
 import type { TranscriptChunk, CoachingPrompt, SessionConfig, Session } from "@shared/schema";
 import { callTypeLabels, priorityLabels } from "@shared/schema";
+
+declare global {
+  interface Window {
+    SpeechRecognition: typeof SpeechRecognition;
+    webkitSpeechRecognition: typeof SpeechRecognition;
+  }
+}
 
 function formatTimer(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
@@ -30,6 +37,104 @@ function TeamsSidebarSection() {
 
   const [injectText, setInjectText] = useState("");
   const [injectSpeaker, setInjectSpeaker] = useState<"rep" | "prospect">("rep");
+  const [isListening, setIsListening] = useState(false);
+  const [interimText, setInterimText] = useState("");
+  const [micError, setMicError] = useState<string | null>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const speakerRef = useRef<"rep" | "prospect">("rep");
+
+  useEffect(() => {
+    speakerRef.current = injectSpeaker;
+  }, [injectSpeaker]);
+
+  const SpeechRecognitionAPI =
+    typeof window !== "undefined"
+      ? window.SpeechRecognition || window.webkitSpeechRecognition
+      : null;
+
+  const speechSupported = !!SpeechRecognitionAPI;
+
+  const startListening = useCallback(() => {
+    if (!SpeechRecognitionAPI) return;
+    setMicError(null);
+
+    const recognition = new SpeechRecognitionAPI();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "en-US";
+    recognitionRef.current = recognition;
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        if (result.isFinal) {
+          const text = result[0].transcript.trim();
+          if (text) {
+            socketClient.send({
+              type: "transcript_chunk",
+              speaker: speakerRef.current,
+              text,
+            });
+          }
+          setInterimText("");
+        } else {
+          interim += result[0].transcript;
+        }
+      }
+      setInterimText(interim);
+    };
+
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      if (event.error === "not-allowed") {
+        setMicError("Microphone access denied. Allow mic access and try again.");
+      } else if (event.error === "no-speech") {
+        // silence — not an actual error
+      } else {
+        setMicError(`Speech recognition error: ${event.error}`);
+      }
+      setIsListening(false);
+      setInterimText("");
+    };
+
+    recognition.onend = () => {
+      setIsListening((prev) => {
+        if (prev) {
+          // auto-restart if user hasn't manually stopped
+          try { recognition.start(); } catch {}
+          return true;
+        }
+        return false;
+      });
+      setInterimText("");
+    };
+
+    try {
+      recognition.start();
+      setIsListening(true);
+    } catch (err) {
+      setMicError("Could not start speech recognition.");
+    }
+  }, [SpeechRecognitionAPI]);
+
+  const stopListening = useCallback(() => {
+    setIsListening(false);
+    setInterimText("");
+    if (recognitionRef.current) {
+      recognitionRef.current.onend = null;
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.onend = null;
+        recognitionRef.current.stop();
+      }
+    };
+  }, []);
 
   const handleInject = () => {
     if (!injectText.trim()) return;
@@ -47,49 +152,100 @@ function TeamsSidebarSection() {
       <p className="text-xs text-muted-foreground uppercase tracking-wider">Teams</p>
       <TeamsStatusCard status={teamsStatus} compact />
 
-      {teamsStatus.transcriptStatus === "unavailable" && (
-        <div className="space-y-1.5 pt-2 border-t">
-          <p className="text-xs text-yellow-500 dark:text-yellow-400">Transcript unavailable</p>
-          <p className="text-xs text-muted-foreground">
-            Use the transcript injection below, or end this session and switch modes.
-          </p>
+      <div className="space-y-2 pt-2 border-t">
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">Transcript Source</p>
+          <Badge
+            variant="outline"
+            className={`text-xs no-default-active-elevate px-1.5 py-0 ${isListening ? "border-green-500 text-green-500" : "border-muted-foreground/40"}`}
+            data-testid="badge-transcript-source"
+          >
+            {isListening ? "Live Mic" : "Manual"}
+          </Badge>
         </div>
-      )}
 
-      {(teamsStatus.transcriptStatus === "demo_injection" || teamsStatus.transcriptStatus === "scaffolded" || teamsStatus.transcriptStatus === "unavailable") && (
-        <div className="space-y-2 pt-2 border-t">
-          <p className="text-xs text-muted-foreground">Inject Transcript</p>
-          <Select value={injectSpeaker} onValueChange={(v) => setInjectSpeaker(v as "rep" | "prospect")}>
-            <SelectTrigger className="h-7 text-xs" data-testid="select-inject-speaker">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="rep">Rep</SelectItem>
-              <SelectItem value="prospect">Prospect</SelectItem>
-            </SelectContent>
-          </Select>
-          <div className="flex gap-1">
-            <Input
-              data-testid="input-inject-transcript"
-              className="h-7 text-xs"
-              placeholder="Type transcript..."
-              value={injectText}
-              onChange={(e) => setInjectText(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleInject()}
-            />
-            <Button
-              data-testid="button-inject-transcript"
-              variant="secondary"
-              size="sm"
-              className="h-7 w-7 p-0 flex-shrink-0"
-              onClick={handleInject}
-              disabled={!injectText.trim()}
-            >
-              <Send className="w-3 h-3" />
-            </Button>
+        <Select value={injectSpeaker} onValueChange={(v) => setInjectSpeaker(v as "rep" | "prospect")}>
+          <SelectTrigger className="h-7 text-xs" data-testid="select-inject-speaker">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="rep">Rep (you)</SelectItem>
+            <SelectItem value="prospect">Prospect</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {speechSupported && (
+          <Button
+            data-testid="button-toggle-listening"
+            variant={isListening ? "destructive" : "default"}
+            size="sm"
+            className="w-full h-8 text-xs"
+            onClick={isListening ? stopListening : startListening}
+          >
+            {isListening ? (
+              <>
+                <MicOff className="w-3.5 h-3.5 mr-1.5" />
+                Stop Listening
+              </>
+            ) : (
+              <>
+                <Radio className="w-3.5 h-3.5 mr-1.5" />
+                Start Live Transcription
+              </>
+            )}
+          </Button>
+        )}
+
+        {isListening && interimText && (
+          <div
+            className="text-xs text-muted-foreground italic bg-muted/50 rounded px-2 py-1.5 leading-relaxed"
+            data-testid="text-interim-speech"
+          >
+            {interimText}
           </div>
+        )}
+
+        {isListening && !interimText && (
+          <div className="flex items-center gap-1.5 text-xs text-green-500">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+            </span>
+            Listening...
+          </div>
+        )}
+
+        {!speechSupported && (
+          <p className="text-xs text-yellow-500">
+            Live mic not supported in this browser. Use Chrome or Edge.
+          </p>
+        )}
+
+        {micError && (
+          <p className="text-xs text-destructive" data-testid="text-mic-error">{micError}</p>
+        )}
+
+        <div className="flex gap-1 pt-1">
+          <Input
+            data-testid="input-inject-transcript"
+            className="h-7 text-xs"
+            placeholder={isListening ? "Or type manually..." : "Type transcript..."}
+            value={injectText}
+            onChange={(e) => setInjectText(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleInject()}
+          />
+          <Button
+            data-testid="button-inject-transcript"
+            variant="secondary"
+            size="sm"
+            className="h-7 w-7 p-0 flex-shrink-0"
+            onClick={handleInject}
+            disabled={!injectText.trim()}
+          >
+            <Send className="w-3 h-3" />
+          </Button>
         </div>
-      )}
+      </div>
     </div>
   );
 }
