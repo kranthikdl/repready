@@ -46,7 +46,7 @@ export async function registerRoutes(
       const text = await transcribeAudio(audioBuffer, mimeType);
 
       if (text === null) {
-        return res.status(422).json({ message: "Could not transcribe audio — no speech detected or API error" });
+        return res.status(500).json({ message: "Transcription service error. Check your OpenAI API key." });
       }
 
       res.json({ text });

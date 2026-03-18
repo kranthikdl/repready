@@ -26,7 +26,7 @@ export async function transcribeAudio(
       file,
       language: "en",
     });
-    return response.text?.trim() || null;
+    return response.text?.trim() ?? "";
   } catch (err) {
     log(`Whisper transcription error: ${err}`, "llm");
     return null;
