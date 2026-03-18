@@ -15,13 +15,6 @@ import TeamsStatusCard from "@/components/TeamsStatusCard";
 import type { TranscriptChunk, CoachingPrompt, SessionConfig, Session } from "@shared/schema";
 import { callTypeLabels, priorityLabels } from "@shared/schema";
 
-declare global {
-  interface Window {
-    SpeechRecognition: typeof SpeechRecognition;
-    webkitSpeechRecognition: typeof SpeechRecognition;
-  }
-}
-
 function formatTimer(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
   const minutes = Math.floor(totalSeconds / 60);
@@ -38,100 +31,94 @@ function TeamsSidebarSection() {
   const [injectText, setInjectText] = useState("");
   const [injectSpeaker, setInjectSpeaker] = useState<"rep" | "prospect">("rep");
   const [isListening, setIsListening] = useState(false);
-  const [interimText, setInterimText] = useState("");
+  const [processingCount, setProcessingCount] = useState(0);
   const [micError, setMicError] = useState<string | null>(null);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const speakerRef = useRef<"rep" | "prospect">("rep");
 
   useEffect(() => {
     speakerRef.current = injectSpeaker;
   }, [injectSpeaker]);
 
-  const SpeechRecognitionAPI =
-    typeof window !== "undefined"
-      ? window.SpeechRecognition || window.webkitSpeechRecognition
-      : null;
-
-  const speechSupported = !!SpeechRecognitionAPI;
-
-  const startListening = useCallback(() => {
-    if (!SpeechRecognitionAPI) return;
-    setMicError(null);
-
-    const recognition = new SpeechRecognitionAPI();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = "en-US";
-    recognitionRef.current = recognition;
-
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let interim = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        if (result.isFinal) {
-          const text = result[0].transcript.trim();
-          if (text) {
-            socketClient.send({
-              type: "transcript_chunk",
-              speaker: speakerRef.current,
-              text,
-            });
-          }
-          setInterimText("");
-        } else {
-          interim += result[0].transcript;
-        }
-      }
-      setInterimText(interim);
-    };
-
-    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      if (event.error === "not-allowed") {
-        setMicError("Microphone access denied. Allow mic access and try again.");
-      } else if (event.error === "no-speech") {
-        // silence — not an actual error
-      } else {
-        setMicError(`Speech recognition error: ${event.error}`);
-      }
-      setIsListening(false);
-      setInterimText("");
-    };
-
-    recognition.onend = () => {
-      setIsListening((prev) => {
-        if (prev) {
-          // auto-restart if user hasn't manually stopped
-          try { recognition.start(); } catch {}
-          return true;
-        }
-        return false;
-      });
-      setInterimText("");
-    };
-
+  const sendChunkToWhisper = useCallback(async (blob: Blob) => {
+    if (blob.size < 1000) return;
+    setProcessingCount((c) => c + 1);
     try {
-      recognition.start();
-      setIsListening(true);
-    } catch (err) {
-      setMicError("Could not start speech recognition.");
+      const mimeType = blob.type || "audio/webm";
+      const res = await fetch("/api/transcribe", {
+        method: "POST",
+        headers: { "Content-Type": mimeType },
+        body: blob,
+      });
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({ message: "Transcription failed" }));
+        setMicError((errBody as { message?: string }).message || "Transcription failed");
+        return;
+      }
+      const { text } = await res.json() as { text: string };
+      if (text && text.trim()) {
+        socketClient.send({
+          type: "transcript_chunk",
+          speaker: speakerRef.current,
+          text: text.trim(),
+        });
+      }
+    } catch {
+      setMicError("Failed to reach transcription service. Check your connection.");
+    } finally {
+      setProcessingCount((c) => Math.max(0, c - 1));
     }
-  }, [SpeechRecognitionAPI]);
+  }, []);
+
+  const startListening = useCallback(async () => {
+    setMicError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/webm")
+        ? "audio/webm"
+        : "audio/ogg";
+      const recorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          sendChunkToWhisper(e.data);
+        }
+      };
+
+      recorder.onerror = () => {
+        setMicError("Recording error. Please try again.");
+        setIsListening(false);
+      };
+
+      recorder.start(4000);
+      setIsListening(true);
+    } catch (err: unknown) {
+      const name = err instanceof DOMException ? err.name : (err as { name?: string })?.name;
+      if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+        setMicError("Microphone access denied. Allow mic access and try again.");
+      } else {
+        setMicError("Could not start microphone recording.");
+      }
+    }
+  }, [sendChunkToWhisper]);
 
   const stopListening = useCallback(() => {
     setIsListening(false);
-    setInterimText("");
-    if (recognitionRef.current) {
-      recognitionRef.current.onend = null;
-      recognitionRef.current.stop();
-      recognitionRef.current = null;
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stream.getTracks().forEach((t) => t.stop());
+      mediaRecorderRef.current = null;
     }
   }, []);
 
   useEffect(() => {
     return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.onend = null;
-        recognitionRef.current.stop();
+      if (mediaRecorderRef.current) {
+        mediaRecorderRef.current.stop();
+        mediaRecorderRef.current.stream.getTracks().forEach((t) => t.stop());
       }
     };
   }, []);
@@ -174,51 +161,47 @@ function TeamsSidebarSection() {
           </SelectContent>
         </Select>
 
-        {speechSupported && (
-          <Button
-            data-testid="button-toggle-listening"
-            variant={isListening ? "destructive" : "default"}
-            size="sm"
-            className="w-full h-8 text-xs"
-            onClick={isListening ? stopListening : startListening}
-          >
-            {isListening ? (
-              <>
-                <MicOff className="w-3.5 h-3.5 mr-1.5" />
-                Stop Listening
-              </>
-            ) : (
-              <>
-                <Radio className="w-3.5 h-3.5 mr-1.5" />
-                Start Live Transcription
-              </>
-            )}
-          </Button>
-        )}
+        <Button
+          data-testid="button-toggle-listening"
+          variant={isListening ? "destructive" : "default"}
+          size="sm"
+          className="w-full h-8 text-xs"
+          onClick={isListening ? stopListening : startListening}
+        >
+          {isListening ? (
+            <>
+              <MicOff className="w-3.5 h-3.5 mr-1.5" />
+              Stop Listening
+            </>
+          ) : (
+            <>
+              <Radio className="w-3.5 h-3.5 mr-1.5" />
+              Start Live Transcription
+            </>
+          )}
+        </Button>
 
-        {isListening && interimText && (
+        {isListening && processingCount > 0 && (
           <div
-            className="text-xs text-muted-foreground italic bg-muted/50 rounded px-2 py-1.5 leading-relaxed"
-            data-testid="text-interim-speech"
+            className="flex items-center gap-1.5 text-xs text-muted-foreground"
+            data-testid="text-processing-indicator"
           >
-            {interimText}
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+            </span>
+            Processing...
           </div>
         )}
 
-        {isListening && !interimText && (
-          <div className="flex items-center gap-1.5 text-xs text-green-500">
+        {isListening && processingCount === 0 && (
+          <div className="flex items-center gap-1.5 text-xs text-green-500" data-testid="text-listening-indicator">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
             </span>
             Listening...
           </div>
-        )}
-
-        {!speechSupported && (
-          <p className="text-xs text-yellow-500">
-            Live mic not supported in this browser. Use Chrome or Edge.
-          </p>
         )}
 
         {micError && (

@@ -1,8 +1,10 @@
+import express from "express";
 import type { Express } from "express";
 import { type Server } from "http";
 import { sessionStorage } from "./services/storageService";
 import { setupWebSocket } from "./services/sessionSocket";
 import { sessionConfigSchema } from "@shared/schema";
+import { transcribeAudio } from "./services/llmService";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -30,6 +32,26 @@ export async function registerRoutes(
     }
     res.json({ message: "Session deleted" });
   });
+
+  app.post(
+    "/api/transcribe",
+    express.raw({ type: "*/*", limit: "10mb" }),
+    async (req, res) => {
+      const audioBuffer = req.body as Buffer;
+      if (!audioBuffer || audioBuffer.length === 0) {
+        return res.status(400).json({ message: "No audio data received" });
+      }
+
+      const mimeType = req.headers["content-type"] || "audio/webm";
+      const text = await transcribeAudio(audioBuffer, mimeType);
+
+      if (text === null) {
+        return res.status(422).json({ message: "Could not transcribe audio — no speech detected or API error" });
+      }
+
+      res.json({ text });
+    }
+  );
 
   return httpServer;
 }

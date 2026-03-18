@@ -57,11 +57,29 @@ export function setupWebSocket(server: Server) {
         if (active) {
           const session = sessionStorage.getSession(currentSessionId);
           if (session && session.status === "active") {
-            const summary = generateMockSummary(
-              session.transcript,
-              session.coachingPrompts,
-              active.config
-            );
+            let summary;
+            if (session.transcript.length === 0) {
+              log("Empty transcript on disconnect — using no-transcript summary", "ws");
+              summary = {
+                callOverview: "No transcript captured — session too short to score.",
+                whatWentWell: [],
+                missedOpportunities: [],
+                recommendedCoachingActions: ["Record a session with more transcript data to receive coaching feedback."],
+                nextStepQualityAssessment: "No transcript was captured during this session.",
+                scorecard: {
+                  discovery: 0,
+                  objectionHandling: 0,
+                  nextStepDiscipline: 0,
+                  overallReadiness: 0,
+                },
+              };
+            } else {
+              summary = generateMockSummary(
+                session.transcript,
+                session.coachingPrompts,
+                active.config
+              );
+            }
             sessionStorage.endSession(currentSessionId, summary);
             log(`Session auto-ended on disconnect: ${currentSessionId}`, "ws");
           }
@@ -152,7 +170,23 @@ async function handleMessage(
       ws.send(JSON.stringify({ type: "generating_summary" }));
 
       let summary = null;
-      if (process.env.OPENAI_API_KEY) {
+
+      if (session.transcript.length === 0) {
+        log("Empty transcript — skipping LLM summary generation", "coaching");
+        summary = {
+          callOverview: "No transcript captured — session too short to score.",
+          whatWentWell: [],
+          missedOpportunities: [],
+          recommendedCoachingActions: ["Record a session with more transcript data to receive coaching feedback."],
+          nextStepQualityAssessment: "No transcript was captured during this session.",
+          scorecard: {
+            discovery: 0,
+            objectionHandling: 0,
+            nextStepDiscipline: 0,
+            overallReadiness: 0,
+          },
+        };
+      } else if (process.env.OPENAI_API_KEY) {
         log("Generating LLM summary...", "coaching");
         summary = await generateSummaryWithLLM(
           session.transcript,
