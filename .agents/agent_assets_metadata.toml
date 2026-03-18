@@ -6,3 +6,9 @@ id = "qz5p9VLsg353p8z4EuqJZ"
 uri = "file://RepReady-Customization-Inputs.md"
 type = "text"
 title = "RepReady — Customer Customization Inputs"
+
+[[outputs]]
+id = "7KAM-bTFGMoT-pDzNqfdi"
+uri = "file://RepReady-Customer-Discovery-QA.md"
+type = "text"
+title = "RepReady — Customer Discovery & Customization Q&A"
