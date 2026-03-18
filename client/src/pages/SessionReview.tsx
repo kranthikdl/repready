@@ -12,7 +12,7 @@ import Scorecard from "@/components/Scorecard";
 import SummaryView from "@/components/SummaryView";
 import TranscriptPanel from "@/components/TranscriptPanel";
 import CoachingPanel from "@/components/CoachingPanel";
-import type { Session } from "@shared/schema";
+import type { Session, CoachingProfile } from "@shared/schema";
 import { callTypeLabels, priorityLabels } from "@shared/schema";
 
 function formatDuration(ms: number): string {
@@ -28,6 +28,10 @@ export default function SessionReview() {
 
   const { data: session, isLoading } = useQuery<Session>({
     queryKey: ["/api/sessions", id],
+  });
+
+  const { data: coachingProfile } = useQuery<CoachingProfile>({
+    queryKey: ["/api/coaching-profile"],
   });
 
   const handleExport = () => {
@@ -169,7 +173,7 @@ export default function SessionReview() {
               </CardHeader>
               <CardContent>
                 {session.summary ? (
-                  <Scorecard scorecard={session.summary.scorecard} />
+                  <Scorecard scorecard={session.summary.scorecard} labels={coachingProfile?.scorecardLabels} />
                 ) : (
                   <p className="text-muted-foreground text-sm">No scorecard available</p>
                 )}

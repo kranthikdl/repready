@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { toFile } from "openai";
-import type { TranscriptChunk, CoachingPriority, SessionConfig, SessionSummary, PromptCategory, Severity } from "@shared/schema";
+import type { TranscriptChunk, CoachingPriority, SessionConfig, SessionSummary, PromptCategory, Severity, CoachingProfile } from "@shared/schema";
 import { log } from "../index";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -33,17 +33,35 @@ export async function transcribeAudio(
   }
 }
 
+function buildMethodologyContext(profile?: CoachingProfile): string {
+  if (!profile) return "";
+  const parts: string[] = [];
+  if (profile.methodology?.trim()) {
+    parts.push(`Coaching methodology: ${profile.methodology.trim()}`);
+  }
+  if (profile.customContext?.trim()) {
+    parts.push(`Additional coaching context: ${profile.customContext.trim()}`);
+  }
+  if (profile.competitorNames?.length) {
+    parts.push(`Key competitors to watch for: ${profile.competitorNames.filter(Boolean).join(", ")}`);
+  }
+  return parts.length ? `\n\n${parts.join("\n")}` : "";
+}
+
 export async function evaluateCoachingWithLLM(
   recentTranscript: TranscriptChunk[],
   candidateCategory: PromptCategory,
   candidateReason: string,
-  config: SessionConfig
+  config: SessionConfig,
+  profile?: CoachingProfile
 ): Promise<LLMCoachingResult | null> {
   try {
     const transcriptText = recentTranscript
       .slice(-8)
       .map((c) => `[${c.speaker === "rep" ? "Rep" : "Prospect"}]: ${c.text}`)
       .join("\n");
+
+    const methodologyContext = buildMethodologyContext(profile);
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
@@ -53,7 +71,7 @@ export async function evaluateCoachingWithLLM(
       messages: [
         {
           role: "system",
-          content: `You are a real-time sales coaching AI. You evaluate whether a coaching prompt should fire during a live SDR call.
+          content: `You are a real-time sales coaching AI. You evaluate whether a coaching prompt should fire during a live SDR call.${methodologyContext}
 
 You receive:
 - Recent transcript from the call
@@ -68,6 +86,7 @@ Rules:
 - Keep message to ONE sentence, max 20 words
 - Be specific to what just happened in the conversation
 - Severity: "low" for minor suggestions, "medium" for clear missed opportunities, "high" for critical moments that could lose the deal
+- If a coaching methodology is specified above, ensure your coaching advice aligns with it
 
 Respond with JSON only:
 {
@@ -109,7 +128,8 @@ ${transcriptText}`
 export async function generateSummaryWithLLM(
   transcript: TranscriptChunk[],
   firedPrompts: { category: string; title: string; severity: string; reason?: string }[],
-  config: SessionConfig
+  config: SessionConfig,
+  profile?: CoachingProfile
 ): Promise<SessionSummary | null> {
   try {
     const transcriptText = transcript
@@ -120,6 +140,14 @@ export async function generateSummaryWithLLM(
       ? firedPrompts.map((p) => `- [${p.severity}] ${p.category}: ${p.title}${p.reason ? ` (${p.reason})` : ""}`).join("\n")
       : "No coaching prompts were fired during the call.";
 
+    const methodologyContext = buildMethodologyContext(profile);
+
+    const labels = profile?.scorecardLabels;
+    const discoveryLabel = labels?.discovery || "Discovery";
+    const objectionLabel = labels?.objectionHandling || "Objection Handling";
+    const nextStepLabel = labels?.nextStepDiscipline || "Next-Step Discipline";
+    const overallLabel = labels?.overall || "Overall Readiness";
+
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       temperature: 0.4,
@@ -128,7 +156,7 @@ export async function generateSummaryWithLLM(
       messages: [
         {
           role: "system",
-          content: `You are a sales coaching analyst. Given a complete call transcript and the coaching prompts that fired during the call, generate a structured post-call summary and readiness scorecard.
+          content: `You are a sales coaching analyst. Given a complete call transcript and the coaching prompts that fired during the call, generate a structured post-call summary and readiness scorecard.${methodologyContext}
 
 Scoring guidelines (0-100):
 - 90+: Exceptional, almost no issues
@@ -137,7 +165,14 @@ Scoring guidelines (0-100):
 - 40-59: Needs significant improvement
 - Below 40: Critical gaps in this area
 
+${methodologyContext ? "Apply the coaching methodology specified above when evaluating performance and making recommendations." : ""}
 Be honest but constructive. Each "whatWentWell" and "missedOpportunities" item should be ONE specific, concrete sentence. Recommended actions should be actionable and specific.
+
+Scorecard dimensions for this team:
+- ${discoveryLabel} (key: "discovery")
+- ${objectionLabel} (key: "objectionHandling")
+- ${nextStepLabel} (key: "nextStepDiscipline")
+- ${overallLabel} (key: "overallReadiness")
 
 Respond with JSON only:
 {

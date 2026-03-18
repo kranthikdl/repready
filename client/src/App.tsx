@@ -8,6 +8,7 @@ import SessionSetup from "@/pages/SessionSetup";
 import LiveSession from "@/pages/LiveSession";
 import SessionReview from "@/pages/SessionReview";
 import PreviousSessions from "@/pages/PreviousSessions";
+import CoachingProfilePage from "@/pages/CoachingProfile";
 
 function Router() {
   return (
@@ -16,6 +17,7 @@ function Router() {
       <Route path="/session" component={LiveSession} />
       <Route path="/review/:id" component={SessionReview} />
       <Route path="/sessions" component={PreviousSessions} />
+      <Route path="/profile" component={CoachingProfilePage} />
       <Route component={NotFound} />
     </Switch>
   );

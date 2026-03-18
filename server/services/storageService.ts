@@ -1,8 +1,10 @@
-import type { Session, SessionConfig, TranscriptChunk, CoachingPrompt, SessionSummary } from "@shared/schema";
+import type { Session, SessionConfig, TranscriptChunk, CoachingPrompt, SessionSummary, CoachingProfile } from "@shared/schema";
+import { defaultCoachingProfile } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 class SessionStorage {
   private sessions: Map<string, Session> = new Map();
+  private coachingProfile: CoachingProfile = { ...defaultCoachingProfile };
 
   createSession(config: SessionConfig): Session {
     const session: Session = {
@@ -57,6 +59,15 @@ class SessionStorage {
 
   deleteSession(sessionId: string): boolean {
     return this.sessions.delete(sessionId);
+  }
+
+  getCoachingProfile(): CoachingProfile {
+    return this.coachingProfile;
+  }
+
+  setCoachingProfile(profile: CoachingProfile): CoachingProfile {
+    this.coachingProfile = profile;
+    return this.coachingProfile;
   }
 }
 

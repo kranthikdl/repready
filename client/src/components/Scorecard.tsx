@@ -1,9 +1,10 @@
-import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import type { SessionScorecard } from "@shared/schema";
+import type { SessionScorecard, ScorecardLabels } from "@shared/schema";
+import { defaultScorecardLabels } from "@shared/schema";
 
 interface ScorecardProps {
   scorecard: SessionScorecard;
+  labels?: ScorecardLabels;
 }
 
 function scoreColor(score: number): string {
@@ -24,17 +25,24 @@ function scoreLabel(score: number): string {
   return "Needs Work";
 }
 
-const categories = [
-  { key: "discovery" as const, label: "Discovery" },
-  { key: "objectionHandling" as const, label: "Objection Handling" },
-  { key: "nextStepDiscipline" as const, label: "Next-Step Discipline" },
-];
+export default function Scorecard({ scorecard, labels }: ScorecardProps) {
+  const l = {
+    ...defaultScorecardLabels,
+    ...Object.fromEntries(
+      Object.entries(labels ?? {}).filter(([, v]) => v && v.trim())
+    ),
+  } as ScorecardLabels;
 
-export default function Scorecard({ scorecard }: ScorecardProps) {
+  const categories = [
+    { key: "discovery" as const, label: l.discovery },
+    { key: "objectionHandling" as const, label: l.objectionHandling },
+    { key: "nextStepDiscipline" as const, label: l.nextStepDiscipline },
+  ];
+
   return (
     <div className="space-y-4">
       <div className="text-center p-6 rounded-md bg-muted/30">
-        <p className="text-sm text-muted-foreground mb-1">Overall Readiness</p>
+        <p className="text-sm text-muted-foreground mb-1">{l.overall}</p>
         <p className={`text-5xl font-bold ${scoreColor(scorecard.overallReadiness)}`} data-testid="text-overall-score">
           {scorecard.overallReadiness}
         </p>

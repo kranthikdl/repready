@@ -6,13 +6,14 @@ import { CoachingEngine } from "./coachingEngine";
 import { getSimulationScript } from "./simulationService";
 import { generateMockSummary } from "./summaryService";
 import { generateSummaryWithLLM } from "./llmService";
-import type { TranscriptChunk, SessionConfig } from "@shared/schema";
+import type { TranscriptChunk, SessionConfig, CoachingProfile } from "@shared/schema";
 import { sessionConfigSchema } from "@shared/schema";
 import { log } from "../index";
 
 interface ActiveSession {
   sessionId: string;
   config: SessionConfig;
+  profile: CoachingProfile;
   coachingEngine: CoachingEngine;
   simulationTimer: ReturnType<typeof setTimeout> | null;
   simulationIndex: number;
@@ -105,12 +106,14 @@ async function handleMessage(
         return null;
       }
       const config = parseResult.data;
+      const profile = sessionStorage.getCoachingProfile();
       const session = sessionStorage.createSession(config);
       const coachingEngine = new CoachingEngine();
 
       const active: ActiveSession = {
         sessionId: session.id,
         config,
+        profile,
         coachingEngine,
         simulationTimer: null,
         simulationIndex: 0,
@@ -196,7 +199,8 @@ async function handleMessage(
             severity: p.severity,
             reason: p.reason,
           })),
-          active.config
+          active.config,
+          active.profile
         );
       }
 
@@ -237,7 +241,8 @@ async function evaluateCoachingAsync(
     const prompt = await active.coachingEngine.evaluateAndGenerate(
       session.transcript,
       active.config,
-      session.startedAt
+      session.startedAt,
+      active.profile
     );
 
     if (prompt) {

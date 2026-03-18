@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import type { TranscriptChunk, CoachingPrompt, CoachingPriority, SessionConfig } from "@shared/schema";
+import type { TranscriptChunk, CoachingPrompt, SessionConfig, CoachingProfile } from "@shared/schema";
 import { evaluateRules } from "./rulesEngine";
 import { evaluateCoachingWithLLM } from "./llmService";
 import { log } from "../index";
@@ -44,9 +44,15 @@ export class CoachingEngine {
   async evaluateAndGenerate(
     transcript: TranscriptChunk[],
     config: SessionConfig,
-    sessionStartTime: number
+    sessionStartTime: number,
+    profile?: CoachingProfile
   ): Promise<CoachingPrompt | null> {
-    const ruleCandidate = evaluateRules(transcript, config.coachingPriorities);
+    const ruleCandidate = evaluateRules(
+      transcript,
+      config.coachingPriorities,
+      profile?.hesitationPhrases ?? [],
+      profile?.competitorNames ?? []
+    );
     if (!ruleCandidate) return null;
 
     const now = Date.now();
@@ -77,7 +83,8 @@ export class CoachingEngine {
           transcript,
           ruleCandidate.category,
           ruleCandidate.reason,
-          config
+          config,
+          profile
         );
 
         if (llmResult && llmResult.firePrompt) {

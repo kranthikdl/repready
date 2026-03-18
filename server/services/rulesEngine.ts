@@ -7,7 +7,7 @@ interface RuleCandidate {
   context: string;
 }
 
-const hesitationPhrases = [
+const defaultHesitationPhrases = [
   "not sure", "i don't know", "maybe", "we'll see",
   "already using", "current vendor", "budget", "timing",
   "concerned", "worried", "expensive", "too much",
@@ -45,10 +45,11 @@ function hasRecentQuestion(transcript: TranscriptChunk[], windowSize: number): b
   );
 }
 
-function detectHesitation(text: string): string | null {
+function detectHesitation(text: string, customPhrases: string[], competitorNames: string[]): string | null {
   const lower = text.toLowerCase();
-  for (const phrase of hesitationPhrases) {
-    if (lower.includes(phrase)) {
+  const allPhrases = [...defaultHesitationPhrases, ...customPhrases, ...competitorNames];
+  for (const phrase of allPhrases) {
+    if (phrase.trim() && lower.includes(phrase.toLowerCase())) {
       return phrase;
     }
   }
@@ -64,7 +65,9 @@ function hasCommitmentLanguage(transcript: TranscriptChunk[], windowSize: number
 
 export function evaluateRules(
   transcript: TranscriptChunk[],
-  priorities: CoachingPriority[]
+  priorities: CoachingPriority[],
+  customHesitationPhrases: string[] = [],
+  competitorNames: string[] = []
 ): RuleCandidate | null {
   if (transcript.length < 3) return null;
 
@@ -75,12 +78,17 @@ export function evaluateRules(
     priorities.includes("objection_handling") &&
     latest.speaker === "prospect"
   ) {
-    const hesitationMatch = detectHesitation(latest.text);
+    const hesitationMatch = detectHesitation(latest.text, customHesitationPhrases, competitorNames);
     if (hesitationMatch) {
+      const isCompetitor = competitorNames.some(
+        (c) => c.trim() && latest.text.toLowerCase().includes(c.toLowerCase())
+      );
       return {
         category: "objection_risk",
-        severity: "medium",
-        reason: `Prospect used hesitation language: "${hesitationMatch}"`,
+        severity: isCompetitor ? "high" : "medium",
+        reason: isCompetitor
+          ? `Prospect mentioned competitor: "${hesitationMatch}"`
+          : `Prospect used hesitation language: "${hesitationMatch}"`,
         context: latest.text,
       };
     }

@@ -32,6 +32,19 @@ export async function registerRoutes(
     res.json({ message: "Session deleted" });
   });
 
+  app.get("/api/coaching-profile", (_req, res) => {
+    res.json(sessionStorage.getCoachingProfile());
+  });
+
+  app.post("/api/coaching-profile", (req, res) => {
+    const profile = req.body;
+    if (!profile || typeof profile !== "object") {
+      return res.status(400).json({ message: "Invalid profile data" });
+    }
+    const updated = sessionStorage.setCoachingProfile(profile);
+    res.json(updated);
+  });
+
   app.post("/api/transcribe", async (req, res) => {
     const { audio, mimeType } = req.body as { audio?: string; mimeType?: string };
     if (!audio) {

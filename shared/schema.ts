@@ -102,6 +102,36 @@ export interface Session {
   duration: number | null;
 }
 
+export interface ScorecardLabels {
+  discovery: string;
+  objectionHandling: string;
+  nextStepDiscipline: string;
+  overall: string;
+}
+
+export interface CoachingProfile {
+  methodology: string;
+  customContext: string;
+  hesitationPhrases: string[];
+  competitorNames: string[];
+  scorecardLabels: ScorecardLabels;
+}
+
+export const defaultScorecardLabels: ScorecardLabels = {
+  discovery: "Discovery",
+  objectionHandling: "Objection Handling",
+  nextStepDiscipline: "Next-Step Discipline",
+  overall: "Overall Readiness",
+};
+
+export const defaultCoachingProfile: CoachingProfile = {
+  methodology: "",
+  customContext: "",
+  hesitationPhrases: [],
+  competitorNames: [],
+  scorecardLabels: { ...defaultScorecardLabels },
+};
+
 export const callTypeLabels: Record<CallType, string> = {
   discovery: "Discovery Call",
   objection_handling: "Objection Handling",

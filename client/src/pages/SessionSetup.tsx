@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Zap, Mic, Play, ChevronRight, Radio, History, Monitor, AlertTriangle } from "lucide-react";
+import { Zap, Mic, Play, ChevronRight, Radio, History, Monitor, AlertTriangle, Settings } from "lucide-react";
 import type { CallType, CoachingPriority, SessionConfig, SessionMode } from "@shared/schema";
 import { callTypeLabels, priorityLabels } from "@shared/schema";
 import { teamsService } from "@/lib/teamsIntegration";
@@ -83,12 +83,20 @@ export default function SessionSetup() {
             <h1 className="text-3xl font-bold tracking-tight" data-testid="text-app-title">RepReady</h1>
           </div>
           <p className="text-muted-foreground text-sm" data-testid="text-app-subtitle">Real-time AI coaching for SDR readiness</p>
-          <Link href="/sessions">
-            <Button variant="ghost" size="sm" className="mt-3" data-testid="link-previous-sessions">
-              <History className="w-3.5 h-3.5 mr-1.5" />
-              Previous Sessions
-            </Button>
-          </Link>
+          <div className="flex items-center gap-1 mt-3">
+            <Link href="/sessions">
+              <Button variant="ghost" size="sm" data-testid="link-previous-sessions">
+                <History className="w-3.5 h-3.5 mr-1.5" />
+                Previous Sessions
+              </Button>
+            </Link>
+            <Link href="/profile">
+              <Button variant="ghost" size="sm" data-testid="link-coaching-profile">
+                <Settings className="w-3.5 h-3.5 mr-1.5" />
+                Coaching Profile
+              </Button>
+            </Link>
+          </div>
         </div>
 
         <Card>
