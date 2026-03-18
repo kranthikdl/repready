@@ -16,7 +16,7 @@ import TeamsStatusCard from "@/components/TeamsStatusCard";
 
 const modeOptions: { value: SessionMode; label: string; icon: typeof Play; desc: string }[] = [
   { value: "simulation", label: "Simulation", icon: Play, desc: "Scripted transcript for demo" },
-  { value: "teams", label: "Live", icon: Monitor, desc: "Teams" },
+  { value: "teams", label: "Teams", icon: Monitor, desc: "Live" },
 ];
 
 export default function SessionSetup() {
@@ -203,7 +203,7 @@ export default function SessionSetup() {
                       >
                         <Link2 className="w-4 h-4 text-muted-foreground" />
                         <span className="text-xs font-medium">HubSpot</span>
-                        <span className="text-xs text-muted-foreground leading-tight">CRM Integration</span>
+                        <span className="text-xs text-muted-foreground leading-tight">Coming Soon</span>
                       </button>
                     </TooltipTrigger>
                     <TooltipContent>
