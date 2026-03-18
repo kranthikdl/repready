@@ -93,7 +93,7 @@ function TeamsSidebarSection() {
         setIsListening(false);
       };
 
-      recorder.start(4000);
+      recorder.start(2000);
       setIsListening(true);
     } catch (err: unknown) {
       const name = err instanceof DOMException ? err.name : (err as { name?: string })?.name;
