@@ -12,3 +12,9 @@ id = "7KAM-bTFGMoT-pDzNqfdi"
 uri = "file://RepReady-Customer-Discovery-QA.md"
 type = "text"
 title = "RepReady — Customer Discovery & Customization Q&A"
+
+[[outputs]]
+id = "cUVnpYhVatqF55QlFXv75"
+uri = "file://RepReady-Pilot-Scaling-QA.md"
+type = "text"
+title = "RepReady — Pilot Scaling & Enterprise Readiness Q&A"
