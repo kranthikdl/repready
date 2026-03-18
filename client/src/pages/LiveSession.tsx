@@ -34,6 +34,8 @@ function TeamsSidebarSection() {
   const [processingCount, setProcessingCount] = useState(0);
   const [micError, setMicError] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const isListeningRef = useRef(false);
   const speakerRef = useRef<"rep" | "prospect">("rep");
 
   useEffect(() => {
@@ -70,31 +72,52 @@ function TeamsSidebarSection() {
     }
   }, []);
 
+  const startCycle = useCallback((stream: MediaStream, mimeType: string) => {
+    if (!isListeningRef.current) return;
+
+    const chunks: Blob[] = [];
+    const recorder = new MediaRecorder(stream, { mimeType });
+    mediaRecorderRef.current = recorder;
+
+    recorder.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) chunks.push(e.data);
+    };
+
+    recorder.onstop = () => {
+      if (chunks.length > 0) {
+        const blob = new Blob(chunks, { type: mimeType });
+        sendChunkToWhisper(blob);
+      }
+      if (isListeningRef.current) {
+        startCycle(stream, mimeType);
+      }
+    };
+
+    recorder.onerror = () => {
+      setMicError("Recording error. Please try again.");
+      isListeningRef.current = false;
+      setIsListening(false);
+    };
+
+    recorder.start();
+    setTimeout(() => {
+      if (recorder.state === "recording") recorder.stop();
+    }, 2000);
+  }, [sendChunkToWhisper]);
+
   const startListening = useCallback(async () => {
     setMicError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
         ? "audio/webm;codecs=opus"
         : MediaRecorder.isTypeSupported("audio/webm")
         ? "audio/webm"
         : "audio/ogg";
-      const recorder = new MediaRecorder(stream, { mimeType });
-      mediaRecorderRef.current = recorder;
-
-      recorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) {
-          sendChunkToWhisper(e.data);
-        }
-      };
-
-      recorder.onerror = () => {
-        setMicError("Recording error. Please try again.");
-        setIsListening(false);
-      };
-
-      recorder.start(2000);
+      isListeningRef.current = true;
       setIsListening(true);
+      startCycle(stream, mimeType);
     } catch (err: unknown) {
       const name = err instanceof DOMException ? err.name : (err as { name?: string })?.name;
       if (name === "NotAllowedError" || name === "PermissionDeniedError") {
@@ -103,22 +126,29 @@ function TeamsSidebarSection() {
         setMicError("Could not start microphone recording.");
       }
     }
-  }, [sendChunkToWhisper]);
+  }, [startCycle]);
 
   const stopListening = useCallback(() => {
+    isListeningRef.current = false;
     setIsListening(false);
-    if (mediaRecorderRef.current) {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
       mediaRecorderRef.current.stop();
-      mediaRecorderRef.current.stream.getTracks().forEach((t) => t.stop());
-      mediaRecorderRef.current = null;
     }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    mediaRecorderRef.current = null;
   }, []);
 
   useEffect(() => {
     return () => {
-      if (mediaRecorderRef.current) {
+      isListeningRef.current = false;
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
         mediaRecorderRef.current.stop();
-        mediaRecorderRef.current.stream.getTracks().forEach((t) => t.stop());
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
       }
     };
   }, []);
