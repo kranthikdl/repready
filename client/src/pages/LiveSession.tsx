@@ -53,8 +53,7 @@ function TeamsSidebarSection() {
         body: blob,
       });
       if (!res.ok) {
-        const errBody = await res.json().catch(() => ({ message: "Transcription failed" }));
-        setMicError((errBody as { message?: string }).message || "Transcription failed");
+        console.warn("[transcribe] chunk rejected:", res.status);
         return;
       }
       const { text } = await res.json() as { text: string };
@@ -66,7 +65,7 @@ function TeamsSidebarSection() {
         });
       }
     } catch {
-      setMicError("Failed to reach transcription service. Check your connection.");
+      console.warn("[transcribe] chunk failed, will retry on next cycle");
     } finally {
       setProcessingCount((c) => Math.max(0, c - 1));
     }
