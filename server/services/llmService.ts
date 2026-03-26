@@ -14,6 +14,26 @@ export interface LLMCoachingResult {
   reason: string;
 }
 
+const WHISPER_HALLUCINATION_PATTERNS = [
+  /^\.+$/,                          // lone periods
+  /thank(s)? for watching/i,
+  /like and subscribe/i,
+  /please subscribe/i,
+  /subs by\s/i,
+  /subtitles by/i,
+  /www\.\S+\.(com|co|uk|net|org)/i, // bare URLs
+  /\.(co\.uk|com|net|org)\s*$/i,
+  /^\s*\[.*\]\s*$/,                 // "[music]" "[applause]" etc.
+  /amara\.org/i,
+];
+
+function isHallucination(text: string): boolean {
+  const t = text.trim();
+  if (!t || t.length < 3) return true;
+  if (/^[.\s,!?…\-–—]+$/.test(t)) return true; // punctuation-only
+  return WHISPER_HALLUCINATION_PATTERNS.some((p) => p.test(t));
+}
+
 export async function transcribeAudio(
   audioBuffer: Buffer,
   mimeType: string
@@ -25,8 +45,14 @@ export async function transcribeAudio(
       model: "whisper-1",
       file,
       language: "en",
+      prompt: "Business sales call between an SDR and a prospect. Direct conversation only.",
     });
-    return response.text?.trim() ?? "";
+    const text = response.text?.trim() ?? "";
+    if (isHallucination(text)) {
+      log(`Whisper hallucination filtered: "${text.slice(0, 60)}"`, "llm");
+      return "";
+    }
+    return text;
   } catch (err) {
     log(`Whisper transcription error: ${err}`, "llm");
     return null;

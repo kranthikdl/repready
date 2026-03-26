@@ -37,6 +37,8 @@ function TeamsSidebarSection() {
   const streamRef = useRef<MediaStream | null>(null);
   const isListeningRef = useRef(false);
   const speakerRef = useRef<"rep" | "prospect">("rep");
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
     speakerRef.current = injectSpeaker;
@@ -77,6 +79,8 @@ function TeamsSidebarSection() {
     }
   }, []);
 
+  const VAD_THRESHOLD = 0.02; // fraction of max amplitude; below = silence
+
   const startCycle = useCallback((stream: MediaStream, mimeType: string) => {
     if (!isListeningRef.current) return;
 
@@ -84,12 +88,29 @@ function TeamsSidebarSection() {
     const recorder = new MediaRecorder(stream, { mimeType });
     mediaRecorderRef.current = recorder;
 
+    // Track peak amplitude during this 2-second window
+    let peakAmplitude = 0;
+    let vadInterval: ReturnType<typeof setInterval> | null = null;
+    if (analyserRef.current) {
+      const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+      vadInterval = setInterval(() => {
+        if (!analyserRef.current) return;
+        analyserRef.current.getByteTimeDomainData(dataArray);
+        for (let i = 0; i < dataArray.length; i++) {
+          const amplitude = Math.abs(dataArray[i] - 128) / 128;
+          if (amplitude > peakAmplitude) peakAmplitude = amplitude;
+        }
+      }, 80);
+    }
+
     recorder.ondataavailable = (e) => {
       if (e.data && e.data.size > 0) chunks.push(e.data);
     };
 
     recorder.onstop = () => {
-      if (chunks.length > 0) {
+      if (vadInterval) clearInterval(vadInterval);
+      // Only send to Whisper if voice activity was detected above threshold
+      if (chunks.length > 0 && peakAmplitude >= VAD_THRESHOLD) {
         const blob = new Blob(chunks, { type: mimeType });
         sendChunkToWhisper(blob);
       }
@@ -99,6 +120,7 @@ function TeamsSidebarSection() {
     };
 
     recorder.onerror = () => {
+      if (vadInterval) clearInterval(vadInterval);
       setMicError("Recording error. Please try again.");
       isListeningRef.current = false;
       setIsListening(false);
@@ -115,6 +137,21 @@ function TeamsSidebarSection() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
+
+      // Wire up AnalyserNode for VAD
+      try {
+        const audioCtx = new AudioContext();
+        const source = audioCtx.createMediaStreamSource(stream);
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0;
+        source.connect(analyser);
+        audioCtxRef.current = audioCtx;
+        analyserRef.current = analyser;
+      } catch {
+        // VAD setup failed — will still record, just without silence gating
+      }
+
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
         ? "audio/webm;codecs=opus"
         : MediaRecorder.isTypeSupported("audio/webm")
@@ -142,6 +179,11 @@ function TeamsSidebarSection() {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
+    }
+    if (audioCtxRef.current) {
+      audioCtxRef.current.close().catch(() => {});
+      audioCtxRef.current = null;
+      analyserRef.current = null;
     }
     mediaRecorderRef.current = null;
   }, []);
