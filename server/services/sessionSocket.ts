@@ -11,10 +11,10 @@ import { sessionConfigSchema } from "@shared/schema";
 import { log } from "../index";
 
 // ─── Guided demo silence-detection constants ────────────────────────────────
-const GUIDED_SILENCE_THRESHOLD_MS = 4500;   // must exceed 2s Whisper chunk cycle + natural sentence gaps
-const GUIDED_REACTION_DELAY_MS    = 1000;   // natural pause before prospect fires
-const GUIDED_MAX_WAIT_MS          = 20000;  // safety: fire anyway if SDR never starts speaking
+const GUIDED_SILENCE_THRESHOLD_MS = 900;    // short threshold: signals ready after SDR pauses
+const GUIDED_MAX_WAIT_MS          = 20000;  // safety: signal ready if SDR never starts speaking
 const GUIDED_MAX_TURN_MS          = 60000;  // absolute ceiling per turn
+const GUIDED_PROSPECT_LOCKOUT_MS  = 3000;   // lockout after prospect fires before re-entering silence detection
 
 // ─── Junk transcript filter constants ───────────────────────────────────────
 const JUNK_MIN_WORD_COUNT = 4;
@@ -52,6 +52,9 @@ interface ActiveSession {
   silenceCheckInterval: ReturnType<typeof setInterval> | null;
   maxWaitTimer: ReturnType<typeof setTimeout> | null;
   waitingForSilence: boolean;
+  readyForProspect: boolean;
+  prospectPlaying: boolean;
+  prospectLockoutTimer: ReturnType<typeof setTimeout> | null;
 }
 
 const activeSessions = new Map<string, ActiveSession>();
@@ -156,6 +159,9 @@ async function handleMessage(
         silenceCheckInterval: null,
         maxWaitTimer: null,
         waitingForSilence: false,
+        readyForProspect: false,
+        prospectPlaying: false,
+        prospectLockoutTimer: null,
       };
       activeSessions.set(session.id, active);
 
@@ -190,7 +196,8 @@ async function handleMessage(
       // In guided mode, update silence tracker on any rep mic activity —
       // do this BEFORE junk filtering so real speech resets the timer even
       // when the chunk is too short to display.
-      if (active.config.mode === "guided" && speaker === "rep" && active.waitingForSilence) {
+      // Skip when prospect is playing to prevent delivery noise re-triggering detection.
+      if (active.config.mode === "guided" && speaker === "rep" && active.waitingForSilence && !active.prospectPlaying) {
         active.lastSpeechAt = Date.now();
         // First rep speech cancels the no-speech max-wait timer
         if (active.maxWaitTimer) {
@@ -286,6 +293,21 @@ async function handleMessage(
       return null;
     }
 
+    case "trigger_prospect_line": {
+      if (!currentSessionId) return null;
+      const active = activeSessions.get(currentSessionId);
+      if (!active || active.config.mode !== "guided") return null;
+      if (!active.readyForProspect) {
+        log("Guided: trigger_prospect_line received but not in ready state — ignoring", "ws");
+        return null;
+      }
+      const script = getGuidedScript(active.config.callType);
+      active.readyForProspect = false;
+      active.prospectPlaying = true;
+      fireProspectLineDirect(currentSessionId, script);
+      return null;
+    }
+
     default:
       ws.send(JSON.stringify({ type: "error", message: `Unknown message type: ${message.type}` }));
       return null;
@@ -368,11 +390,37 @@ function startGuidedSimulation(sessionId: string) {
   startWaitingForSilence(sessionId, script);
 }
 
+function notifyReadyForProspect(sessionId: string, script: { text: string; delayMs: number }[]) {
+  const a = activeSessions.get(sessionId);
+  if (!a || !a.waitingForSilence) return;
+
+  // Clear all timers/intervals
+  if (a.silenceCheckInterval) {
+    clearInterval(a.silenceCheckInterval);
+    a.silenceCheckInterval = null;
+  }
+  if (a.maxWaitTimer) {
+    clearTimeout(a.maxWaitTimer);
+    a.maxWaitTimer = null;
+  }
+  if (a.simulationTimer) {
+    clearTimeout(a.simulationTimer);
+    a.simulationTimer = null;
+  }
+
+  a.waitingForSilence = false;
+  a.readyForProspect = true;
+
+  log(`Guided: ready for prospect line ${a.simulationIndex} — awaiting manual trigger`, "ws");
+  a.ws.send(JSON.stringify({ type: "guided_ready" }));
+}
+
 function startWaitingForSilence(sessionId: string, script: { text: string; delayMs: number }[]) {
   const a = activeSessions.get(sessionId);
   if (!a) return;
 
   a.waitingForSilence = true;
+  a.readyForProspect = false;
   a.lastSpeechAt = null;
 
   // Poll every 200ms to check if silence threshold has been reached
@@ -387,44 +435,30 @@ function startWaitingForSilence(sessionId: string, script: { text: string; delay
     if (current.lastSpeechAt !== null) {
       const silenceDuration = Date.now() - current.lastSpeechAt;
       if (silenceDuration >= GUIDED_SILENCE_THRESHOLD_MS) {
-        // SDR has been silent long enough — fire with reaction delay
-        clearInterval(current.silenceCheckInterval!);
-        current.silenceCheckInterval = null;
-        if (current.maxWaitTimer) {
-          clearTimeout(current.maxWaitTimer);
-          current.maxWaitTimer = null;
-        }
-        if (current.simulationTimer) {
-          clearTimeout(current.simulationTimer);
-          current.simulationTimer = null;
-        }
-        current.simulationTimer = setTimeout(() => {
-          const idx = current.simulationIndex;
-          log(`Guided: silence detected after ${silenceDuration}ms, firing prospect line ${idx}`, "ws");
-          fireProspectLineDirect(sessionId, script);
-        }, GUIDED_REACTION_DELAY_MS);
+        log(`Guided: silence detected after ${silenceDuration}ms — signaling ready`, "ws");
+        notifyReadyForProspect(sessionId, script);
       }
     }
   }, 200);
 
-  // No-speech safety: fire if SDR never starts speaking within max wait
+  // No-speech safety: signal ready if SDR never starts speaking within max wait
   a.maxWaitTimer = setTimeout(() => {
     const current = activeSessions.get(sessionId);
     if (!current || !current.waitingForSilence) return;
-    log(`Guided: no-speech max wait reached (${GUIDED_MAX_WAIT_MS}ms) — firing prospect line anyway`, "ws");
+    log(`Guided: no-speech max wait reached (${GUIDED_MAX_WAIT_MS}ms) — signaling ready`, "ws");
     if (current.silenceCheckInterval) {
       clearInterval(current.silenceCheckInterval);
       current.silenceCheckInterval = null;
     }
     current.maxWaitTimer = null;
-    fireProspectLineDirect(sessionId, script);
+    notifyReadyForProspect(sessionId, script);
   }, GUIDED_MAX_WAIT_MS);
 
-  // Absolute ceiling: fire regardless of ongoing ASR activity (guards against persistent noise)
+  // Absolute ceiling: signal ready regardless of ongoing ASR activity
   a.simulationTimer = setTimeout(() => {
     const current = activeSessions.get(sessionId);
     if (!current || !current.waitingForSilence) return;
-    log(`Guided: absolute turn ceiling reached (${GUIDED_MAX_TURN_MS}ms) — firing prospect line`, "ws");
+    log(`Guided: absolute turn ceiling reached (${GUIDED_MAX_TURN_MS}ms) — signaling ready`, "ws");
     if (current.silenceCheckInterval) {
       clearInterval(current.silenceCheckInterval);
       current.silenceCheckInterval = null;
@@ -434,7 +468,7 @@ function startWaitingForSilence(sessionId: string, script: { text: string; delay
       current.maxWaitTimer = null;
     }
     current.simulationTimer = null;
-    fireProspectLineDirect(sessionId, script);
+    notifyReadyForProspect(sessionId, script);
   }, GUIDED_MAX_TURN_MS);
 }
 
@@ -442,10 +476,7 @@ function fireProspectLineDirect(sessionId: string, script: { text: string; delay
   const a = activeSessions.get(sessionId);
   if (!a) return;
 
-  // Guard: if already fired this turn (e.g. two timers race), bail out
-  if (!a.waitingForSilence) return;
-
-  // Clean up all pending timers/intervals for this turn
+  // Ensure all timers are cleared (safety guard)
   if (a.silenceCheckInterval) {
     clearInterval(a.silenceCheckInterval);
     a.silenceCheckInterval = null;
@@ -462,11 +493,17 @@ function fireProspectLineDirect(sessionId: string, script: { text: string; delay
   a.waitingForSilence = false;
   a.lastSpeechAt = null;
 
-  if (a.simulationIndex >= script.length) return;
+  if (a.simulationIndex >= script.length) {
+    a.prospectPlaying = false;
+    return;
+  }
 
   const line = script[a.simulationIndex];
   const session = sessionStorage.getSession(sessionId);
-  if (!session) return;
+  if (!session) {
+    a.prospectPlaying = false;
+    return;
+  }
 
   const chunk: TranscriptChunk = {
     id: randomUUID(),
@@ -484,7 +521,17 @@ function fireProspectLineDirect(sessionId: string, script: { text: string; delay
   a.simulationIndex++;
 
   if (a.simulationIndex < script.length) {
-    startWaitingForSilence(sessionId, script);
+    // Brief lockout before re-entering silence detection so mic noise during
+    // prospect delivery doesn't immediately re-trigger the ready signal.
+    a.prospectLockoutTimer = setTimeout(() => {
+      const current = activeSessions.get(sessionId);
+      if (!current) return;
+      current.prospectLockoutTimer = null;
+      current.prospectPlaying = false;
+      startWaitingForSilence(sessionId, script);
+    }, GUIDED_PROSPECT_LOCKOUT_MS);
+  } else {
+    a.prospectPlaying = false;
   }
 }
 
@@ -503,5 +550,11 @@ function stopSimulation(sessionId: string) {
     clearTimeout(active.maxWaitTimer);
     active.maxWaitTimer = null;
   }
+  if (active.prospectLockoutTimer) {
+    clearTimeout(active.prospectLockoutTimer);
+    active.prospectLockoutTimer = null;
+  }
   active.waitingForSilence = false;
+  active.readyForProspect = false;
+  active.prospectPlaying = false;
 }

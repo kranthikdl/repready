@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Square, Clock, Zap, Play, Mic, MicOff, User, Phone, Monitor, Send, Radio } from "lucide-react";
+import { Square, Clock, Zap, Play, Mic, MicOff, User, Phone, Monitor, Send, Radio, ChevronRight } from "lucide-react";
 import { socketClient } from "@/lib/socket";
 import { teamsService } from "@/lib/teamsIntegration";
 import TranscriptPanel from "@/components/TranscriptPanel";
@@ -327,6 +327,7 @@ export default function LiveSession() {
   const [isRecording, setIsRecording] = useState(false);
   const [connectionError, setConnectionError] = useState(false);
   const [generatingSummary, setGeneratingSummary] = useState(false);
+  const [guidedState, setGuidedState] = useState<'listening' | 'ready' | 'playing'>('listening');
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -374,6 +375,13 @@ export default function LiveSession() {
 
       socketClient.on("transcript_update", (data) => {
         setTranscript((prev) => [...prev, data.chunk]);
+        if (data.chunk.speaker === "prospect") {
+          setGuidedState("listening");
+        }
+      });
+
+      socketClient.on("guided_ready", () => {
+        setGuidedState("ready");
       });
 
       socketClient.on("coaching_prompt", (data) => {
@@ -419,6 +427,25 @@ export default function LiveSession() {
     setIsEnding(true);
     socketClient.send({ type: "end_session" });
   }, []);
+
+  const handleTriggerProspect = useCallback(() => {
+    if (guidedState !== "ready") return;
+    socketClient.send({ type: "trigger_prospect_line" });
+    setGuidedState("playing");
+  }, [guidedState]);
+
+  useEffect(() => {
+    if (!config || config.mode !== "guided") return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === " " || e.key === "n" || e.key === "N") {
+        e.preventDefault();
+        handleTriggerProspect();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [config, handleTriggerProspect]);
 
   const VAD_THRESHOLD = 0.02;
 
@@ -648,8 +675,19 @@ export default function LiveSession() {
             <div className="mt-auto pt-4 space-y-2">
               {config.mode === "guided" && (
                 <p className="text-xs text-muted-foreground text-center leading-snug">
-                  Prospect lines auto-play · speak your responses live
+                  Speak your response · click Next when ready for prospect
                 </p>
+              )}
+              {config.mode === "guided" && guidedState === "ready" && (
+                <Button
+                  data-testid="button-next-prospect"
+                  size="sm"
+                  className="w-full"
+                  onClick={handleTriggerProspect}
+                >
+                  <ChevronRight className="w-3.5 h-3.5 mr-1.5" />
+                  Next Prospect Response
+                </Button>
               )}
               {!isRecording ? (
                 <Button
