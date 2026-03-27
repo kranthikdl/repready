@@ -1,4 +1,4 @@
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 import { useLocation, Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,16 +7,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Zap, Play, ChevronRight, Radio, History, Monitor, AlertTriangle, Settings, Link2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Zap, Play, Mic, ChevronRight, Radio, History, Settings, ArrowLeftRight } from "lucide-react";
 import type { CallType, CoachingPriority, SessionConfig, SessionMode } from "@shared/schema";
 import { callTypeLabels, priorityLabels } from "@shared/schema";
-import { teamsService } from "@/lib/teamsIntegration";
-import TeamsStatusCard from "@/components/TeamsStatusCard";
 
 const modeOptions: { value: SessionMode; label: string; icon: typeof Play; desc: string }[] = [
   { value: "simulation", label: "Simulation", icon: Play, desc: "Scripted transcript for demo" },
-  { value: "teams", label: "Teams", icon: Monitor, desc: "Live" },
+  { value: "live", label: "Live Mic", icon: Mic, desc: "Browser capture" },
 ];
 
 export default function SessionSetup() {
@@ -26,12 +24,6 @@ export default function SessionSetup() {
   const [priorities, setPriorities] = useState<CoachingPriority[]>(["discovery_depth"]);
   const [talkTrackNotes, setTalkTrackNotes] = useState("");
   const [mode, setMode] = useState<SessionMode>("simulation");
-  const [demoTeamsContext, setDemoTeamsContext] = useState(false);
-
-  const teamsStatus = useSyncExternalStore(
-    (cb) => teamsService.subscribe(cb),
-    () => teamsService.getStatus()
-  );
 
   const togglePriority = (p: CoachingPriority) => {
     setPriorities((prev) =>
@@ -39,38 +31,22 @@ export default function SessionSetup() {
     );
   };
 
-  const toggleDemoContext = () => {
-    if (demoTeamsContext) {
-      setDemoTeamsContext(false);
-      teamsService.disableDemoMode();
-    } else {
-      setDemoTeamsContext(true);
-      teamsService.enableDemoMode();
-    }
-  };
-
   const handleStart = () => {
-    if (priorities.length === 0) return;
-
-    const teamsCtx = mode === "teams" ? teamsService.getContext() : undefined;
-    const resolvedName = sdrName.trim() || (mode === "teams" && teamsCtx?.userDisplayName ? teamsCtx.userDisplayName : "");
-    if (!resolvedName) return;
+    if (!sdrName.trim() || priorities.length === 0) return;
 
     const config: SessionConfig = {
-      sdrName: resolvedName,
+      sdrName: sdrName.trim(),
       callType,
       coachingPriorities: priorities,
       talkTrackNotes: talkTrackNotes.trim() || undefined,
       mode,
-      teamsContext: teamsCtx ? { ...teamsCtx } : undefined,
     };
 
     const encoded = encodeURIComponent(JSON.stringify(config));
     navigate(`/session?config=${encoded}`);
   };
 
-  const teamsAutoName = mode === "teams" && teamsStatus.context?.userDisplayName && !sdrName.trim();
-  const isValid = (sdrName.trim().length > 0 || teamsAutoName) && priorities.length > 0;
+  const isValid = sdrName.trim().length > 0 && priorities.length > 0;
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -197,13 +173,13 @@ export default function SessionSetup() {
                     <TooltipTrigger asChild>
                       <button
                         type="button"
-                        data-testid="button-mode-hubspot"
-                        className="relative flex flex-col items-center gap-1.5 rounded-md p-3 text-center bg-muted/50 opacity-60 cursor-not-allowed"
+                        data-testid="button-mode-bidirectional"
+                        className="relative flex flex-col items-center gap-1.5 rounded-md p-3 text-center bg-muted/50 opacity-50 cursor-not-allowed"
                         disabled
                       >
-                        <Link2 className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-xs font-medium">HubSpot</span>
-                        <span className="text-xs text-muted-foreground leading-tight">Coming Soon</span>
+                        <ArrowLeftRight className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-xs font-medium">Bi-directional</span>
+                        <span className="text-xs text-muted-foreground leading-tight">Teams · HubSpot</span>
                       </button>
                     </TooltipTrigger>
                     <TooltipContent>
@@ -213,48 +189,6 @@ export default function SessionSetup() {
                 </TooltipProvider>
               </div>
             </div>
-
-            {mode === "teams" && (
-              <div className="space-y-3">
-                <TeamsStatusCard status={teamsStatus} />
-
-                {!demoTeamsContext && (
-                  <div className="rounded-md bg-muted/50 p-3 space-y-2">
-                    <div className="flex items-start gap-2">
-                      <AlertTriangle className="w-4 h-4 text-yellow-500 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p className="text-sm font-medium">Scaffolded Integration</p>
-                        <p className="text-xs text-muted-foreground">
-                          Teams mode is scaffolded for architecture demonstration. Enable a demo context to preview the integration surface, or use Simulation/Live mode for a full session.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Button variant="secondary" size="sm" onClick={toggleDemoContext} data-testid="button-enable-demo-teams">
-                        Enable Demo Context
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => setMode("simulation")} data-testid="button-fallback-simulation">
-                        Use Simulation
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {(teamsStatus.contextStatus === "demo_mode" || demoTeamsContext) && (
-                  <div className="rounded-md bg-primary/5 p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs text-muted-foreground">
-                        Demo Teams context is active. Transcript events can be injected manually during the session.
-                      </p>
-                      <Button variant="ghost" size="sm" onClick={toggleDemoContext} data-testid="button-disable-demo-teams">
-                        Disable
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-              </div>
-            )}
 
             <Button
               data-testid="button-start-session"
