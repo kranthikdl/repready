@@ -15,15 +15,19 @@ export interface LLMCoachingResult {
 }
 
 const WHISPER_HALLUCINATION_PATTERNS = [
-  /^\.+$/,                          // lone periods
+  /^\.+$/,                                          // lone periods
   /thank(s)? for watching/i,
   /like and subscribe/i,
   /please subscribe/i,
   /subs by\s/i,
   /subtitles by/i,
-  /www\.\S+\.(com|co|uk|net|org)/i, // bare URLs
-  /\.(co\.uk|com|net|org)\s*$/i,
-  /^\s*\[.*\]\s*$/,                 // "[music]" "[applause]" etc.
+  /www\.\S+\.\w{2,}/i,                              // any www. URL regardless of TLD
+  /https?:\/\/\S+/i,                                // any http/https URL
+  /\.(com|co\.uk|net|org|gov|edu|io)\s*$/i,         // text ending in a domain TLD
+  /contact us at\s/i,                               // "contact us at …"
+  /visit us at\s/i,
+  /for more information.*visit/i,
+  /^\s*\[.*\]\s*$/,                                 // "[music]" "[applause]" etc.
   /amara\.org/i,
 ];
 
