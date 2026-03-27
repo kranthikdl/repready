@@ -11,10 +11,10 @@ import { sessionConfigSchema } from "@shared/schema";
 import { log } from "../index";
 
 // ─── Guided demo silence-detection constants ────────────────────────────────
-const GUIDED_SILENCE_THRESHOLD_MS = 1800;   // ms of no new transcription → SDR has finished speaking
-const GUIDED_REACTION_DELAY_MS    = 800;    // natural pause before prospect fires
-const GUIDED_MAX_WAIT_MS          = 15000;  // safety: fire anyway if SDR never starts speaking
-const GUIDED_MAX_TURN_MS          = 45000;  // absolute ceiling per turn (even under persistent ASR noise)
+const GUIDED_SILENCE_THRESHOLD_MS = 4500;   // must exceed 2s Whisper chunk cycle + natural sentence gaps
+const GUIDED_REACTION_DELAY_MS    = 1000;   // natural pause before prospect fires
+const GUIDED_MAX_WAIT_MS          = 20000;  // safety: fire anyway if SDR never starts speaking
+const GUIDED_MAX_TURN_MS          = 60000;  // absolute ceiling per turn
 
 // ─── Junk transcript filter constants ───────────────────────────────────────
 const JUNK_MIN_WORD_COUNT = 4;
