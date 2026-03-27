@@ -155,7 +155,7 @@ export default function SessionReview() {
               <TabsContent value="transcript" className="mt-4">
                 <Card>
                   <div className="h-[500px]">
-                    <TranscriptPanel chunks={session.transcript} />
+                    <TranscriptPanel chunks={session.transcript} repName={session.config.sdrName} />
                   </div>
                 </Card>
               </TabsContent>

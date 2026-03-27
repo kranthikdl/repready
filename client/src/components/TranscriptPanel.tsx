@@ -5,6 +5,7 @@ import type { TranscriptChunk } from "@shared/schema";
 
 interface TranscriptPanelProps {
   chunks: TranscriptChunk[];
+  repName?: string;
 }
 
 function formatSessionTime(ms: number): string {
@@ -14,7 +15,7 @@ function formatSessionTime(ms: number): string {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
-export default function TranscriptPanel({ chunks }: TranscriptPanelProps) {
+export default function TranscriptPanel({ chunks, repName }: TranscriptPanelProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -50,13 +51,15 @@ export default function TranscriptPanel({ chunks }: TranscriptPanelProps) {
                       : "bg-muted text-muted-foreground"
                   }`}
                 >
-                  {chunk.speaker === "rep" ? "R" : "P"}
+                  {chunk.speaker === "rep"
+                    ? (repName ? repName[0].toUpperCase() : "R")
+                    : "P"}
                 </div>
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
                   <span className="text-xs font-medium">
-                    {chunk.speaker === "rep" ? "Rep" : "Prospect"}
+                    {chunk.speaker === "rep" ? (repName ?? "Rep") : "Prospect"}
                   </span>
                   <span className="text-xs text-muted-foreground">
                     {formatSessionTime(chunk.sessionTime)}

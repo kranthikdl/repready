@@ -683,7 +683,7 @@ export default function LiveSession() {
         </div>
 
         <div className="flex-1 min-w-0 border-r">
-          <TranscriptPanel chunks={transcript} />
+          <TranscriptPanel chunks={transcript} repName={config.sdrName} />
         </div>
 
         <div className="w-80 flex-shrink-0">
