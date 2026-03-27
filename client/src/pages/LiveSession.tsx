@@ -331,6 +331,10 @@ export default function LiveSession() {
   const startTimeRef = useRef<number>(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const activePromptTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const liveMicStreamRef = useRef<MediaStream | null>(null);
+  const liveMicIsListeningRef = useRef(false);
+  const liveMicAnalyserRef = useRef<AnalyserNode | null>(null);
+  const liveMicAudioCtxRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
     if (!configStr) {
@@ -416,36 +420,120 @@ export default function LiveSession() {
     socketClient.send({ type: "end_session" });
   }, []);
 
-  const handleStartRecording = useCallback(async () => {
+  const VAD_THRESHOLD = 0.02;
+
+  const sendLiveChunkToWhisper = useCallback(async (blob: Blob) => {
+    if (blob.size < 1000) return;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
-      mediaRecorderRef.current = mediaRecorder;
-
-      mediaRecorder.ondataavailable = async (event) => {
-        if (event.data.size > 0) {
-          socketClient.send({
-            type: "transcript_chunk",
-            speaker: "rep",
-            text: "[Live audio chunk - transcription would process here]",
-          });
-        }
-      };
-
-      mediaRecorder.start(5000);
-      setIsRecording(true);
-    } catch (err) {
-      console.error("Failed to start recording:", err);
+      const mimeType = blob.type || "audio/webm";
+      const arrayBuffer = await blob.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = "";
+      for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+      const audio = btoa(binary);
+      const res = await fetch("/api/transcribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ audio, mimeType }),
+      });
+      if (!res.ok) return;
+      const { text } = await res.json() as { text: string };
+      if (text && text.trim()) {
+        socketClient.send({ type: "transcript_chunk", speaker: "rep", text: text.trim() });
+      }
+    } catch {
+      // silent — chunk failures don't surface to the user
     }
   }, []);
 
-  const handleStopRecording = useCallback(() => {
-    if (mediaRecorderRef.current) {
-      mediaRecorderRef.current.stop();
-      mediaRecorderRef.current.stream.getTracks().forEach((t) => t.stop());
-      mediaRecorderRef.current = null;
+  const startLiveCycle = useCallback((stream: MediaStream, mimeType: string) => {
+    if (!liveMicIsListeningRef.current) return;
+    const chunks: Blob[] = [];
+    const recorder = new MediaRecorder(stream, { mimeType });
+    mediaRecorderRef.current = recorder;
+
+    let peakAmplitude = 0;
+    let vadInterval: ReturnType<typeof setInterval> | null = null;
+    if (liveMicAnalyserRef.current) {
+      const dataArray = new Uint8Array(liveMicAnalyserRef.current.frequencyBinCount);
+      vadInterval = setInterval(() => {
+        if (!liveMicAnalyserRef.current) return;
+        liveMicAnalyserRef.current.getByteTimeDomainData(dataArray);
+        for (let i = 0; i < dataArray.length; i++) {
+          const amp = Math.abs(dataArray[i] - 128) / 128;
+          if (amp > peakAmplitude) peakAmplitude = amp;
+        }
+      }, 80);
     }
+
+    recorder.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) chunks.push(e.data);
+    };
+    recorder.onstop = () => {
+      if (vadInterval) clearInterval(vadInterval);
+      if (chunks.length > 0 && peakAmplitude >= VAD_THRESHOLD) {
+        sendLiveChunkToWhisper(new Blob(chunks, { type: mimeType }));
+      }
+      if (liveMicIsListeningRef.current) startLiveCycle(stream, mimeType);
+    };
+    recorder.onerror = () => {
+      if (vadInterval) clearInterval(vadInterval);
+      liveMicIsListeningRef.current = false;
+      setIsRecording(false);
+    };
+
+    recorder.start();
+    setTimeout(() => { if (recorder.state === "recording") recorder.stop(); }, 2000);
+  }, [sendLiveChunkToWhisper]);
+
+  const handleStartRecording = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      liveMicStreamRef.current = stream;
+
+      try {
+        const audioCtx = new AudioContext();
+        const source = audioCtx.createMediaStreamSource(stream);
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0;
+        source.connect(analyser);
+        liveMicAudioCtxRef.current = audioCtx;
+        liveMicAnalyserRef.current = analyser;
+      } catch {
+        // VAD unavailable — recording continues without silence gating
+      }
+
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/webm")
+        ? "audio/webm"
+        : "audio/ogg";
+
+      liveMicIsListeningRef.current = true;
+      setIsRecording(true);
+      startLiveCycle(stream, mimeType);
+    } catch {
+      // mic access denied or unavailable — fail silently
+    }
+  }, [startLiveCycle]);
+
+  const handleStopRecording = useCallback(() => {
+    liveMicIsListeningRef.current = false;
     setIsRecording(false);
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      mediaRecorderRef.current.stop();
+    }
+    if (liveMicStreamRef.current) {
+      liveMicStreamRef.current.getTracks().forEach((t) => t.stop());
+      liveMicStreamRef.current = null;
+    }
+    if (liveMicAudioCtxRef.current) {
+      liveMicAudioCtxRef.current.close().catch(() => {});
+      liveMicAudioCtxRef.current = null;
+      liveMicAnalyserRef.current = null;
+    }
+    mediaRecorderRef.current = null;
   }, []);
 
   if (!config) return null;
