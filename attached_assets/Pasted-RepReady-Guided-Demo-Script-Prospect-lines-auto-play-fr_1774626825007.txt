@@ -27,3 +27,10 @@ Alex: Great question. Our AI engine analyzes each prospect's digital footprint a
 Alex: Yeah that's a common concern. Our approach is different because we don't write the messages for you. We surface the insights and your reps craft the message. It's augmentation, not automation.
 → App plays: "Okay, that distinction is helpful. What kind of results are your customers seeing?"
 Alex: On average, teams see a 40% increase in meetings booked within the first 90 days. Our best customers have cut research time by 70%.
+
+→ App plays: "Those numbers are impressive. What does pricing look like?"
+Alex: We have a few tiers depending on team size and features. For a team of 12, you’d likely be looking at our Growth plan. I can send over a detailed proposal.
+→ App plays: "Sure, that would be great. I’d also want to loop in my VP of Sales before making any decisions."
+Alex: Absolutely. Would it make sense to set up a follow-up call next week with your VP? I could do a more tailored demo with their priorities in mind.
+→ App plays: "Yeah, let me check their calendar and get back to you. Can you send me a calendar link?"
+Alex: Of course! I’ll send that over right after our call along with the proposal. Thanks so much for your time today, Sarah.
