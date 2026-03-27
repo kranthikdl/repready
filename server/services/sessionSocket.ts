@@ -178,7 +178,8 @@ async function handleMessage(
 
       const MIN_SESSION_MS = 1 * 60 * 1000; // 1 minute minimum
       const sessionDuration = Date.now() - session.startedAt;
-      const hasEnoughData = session.transcript.length > 0 && sessionDuration >= MIN_SESSION_MS;
+      const repChunks = session.transcript.filter((c) => c.speaker === "rep");
+      const hasEnoughData = repChunks.length > 0 && sessionDuration >= MIN_SESSION_MS;
 
       if (!hasEnoughData) {
         log(`Insufficient data for scoring (${Math.round(sessionDuration / 1000)}s, ${session.transcript.length} chunks) — skipping summary generation`, "coaching");

@@ -7,13 +7,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Zap, Play, Mic, ChevronRight, Radio, History, Settings, Clapperboard } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Zap, Play, ChevronRight, Radio, History, Settings, Clapperboard, ArrowLeftRight } from "lucide-react";
 import type { CallType, CoachingPriority, SessionConfig, SessionMode } from "@shared/schema";
 import { callTypeLabels, priorityLabels } from "@shared/schema";
 
 const modeOptions: { value: SessionMode; label: string; icon: typeof Play; desc: string }[] = [
   { value: "simulation", label: "Simulation", icon: Play, desc: "Fully scripted demo" },
-  { value: "live", label: "Live Mic", icon: Mic, desc: "Browser capture" },
   { value: "guided", label: "Guided Demo", icon: Clapperboard, desc: "Auto prospect · live rep mic" },
 ];
 
@@ -167,6 +167,26 @@ export default function SessionSetup() {
                     </button>
                   );
                 })}
+
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        data-testid="button-mode-bidirectional"
+                        className="relative flex flex-col items-center gap-1.5 rounded-md p-3 text-center bg-muted/50 opacity-50 cursor-not-allowed"
+                        disabled
+                      >
+                        <ArrowLeftRight className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-xs font-medium">Bi-directional</span>
+                        <span className="text-xs text-muted-foreground leading-tight">Teams · HubSpot</span>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Coming Soon</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
 
               </div>
             </div>
