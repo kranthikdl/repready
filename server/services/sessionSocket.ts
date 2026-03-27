@@ -228,6 +228,16 @@ async function handleMessage(
       return null;
     }
 
+    case "trigger_prospect_line": {
+      if (!currentSessionId) return null;
+      const active = activeSessions.get(currentSessionId);
+      if (!active || !active.readyForProspect) return null;
+      active.readyForProspect = false;
+      const guidedScript = getGuidedScript(active.config.callType);
+      fireProspectLineDirect(currentSessionId, guidedScript);
+      return null;
+    }
+
     case "end_session": {
       if (!currentSessionId) return null;
       const active = activeSessions.get(currentSessionId);
