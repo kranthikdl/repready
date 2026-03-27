@@ -564,7 +564,7 @@ export default function LiveSession() {
                   onClick={handleStartRecording}
                 >
                   <Mic className="w-3.5 h-3.5 mr-1.5" />
-                  Start Recording
+                  Start Live Transcription
                 </Button>
               ) : (
                 <Button
@@ -575,7 +575,7 @@ export default function LiveSession() {
                   onClick={handleStopRecording}
                 >
                   <Square className="w-3 h-3 mr-1.5" />
-                  Stop Recording
+                  Stop Transcription
                 </Button>
               )}
             </div>
