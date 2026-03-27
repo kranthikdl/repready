@@ -1,0 +1,29 @@
+RepReady — Guided Demo Script
+Prospect lines auto-play from the app. Alex runs the full demo solo.
+
+Setup — SDR (Alex) — Desktop + Browser
+Open RepReady in a browser tab — https://rep-ready.replit.app/
+On the setup screen:
+Name → Alex
+Call Type → Discovery
+Coaching Priorities → select all three
+Mode → Guided Demo
+Click Start Session
+Click Start Live Transcription — grant mic permission when prompted
+
+The Call — Alex speaks these lines live into the mic. Prospect lines appear automatically.
+Alex: Hi, thanks for taking the time today. I'm Alex from Velocity. How are you doing?
+→ App plays: "Hey Alex, doing well! Busy quarter but happy to chat."
+Alex: Totally get it. So I know you signed up after seeing our webinar on pipeline acceleration. I'd love to learn a bit more about what caught your eye there.
+→ App plays: "Yeah, we've been struggling with our outbound process. Our SDR team is spending too much time on manual research and not enough time actually selling."
+Alex: That makes sense. A lot of teams we work with face that exact challenge. So tell me, how many SDRs do you have on the team right now?
+→ App plays: "We have about 12 SDRs. We hired aggressively last quarter but ramp time has been brutal. Most of them aren't hitting quota yet."
+Alex: Got it. And what does your current tech stack look like for prospecting? Are you using any automation tools today?
+→ App plays: "We have Salesforce and we use LinkedIn Sales Navigator. But honestly our process is pretty manual. Reps are copying and pasting a lot."
+Alex: I see. Let me tell you about our platform then. Velocity automates the entire prospecting workflow. We integrate directly with Salesforce and can pull enriched data from over 50 sources.
+→ App plays: "That sounds interesting. But I'm curious, how does it handle personalization? We don't want to send generic spray-and-pray messages."
+Alex: Great question. Our AI engine analyzes each prospect's digital footprint and generates personalized talking points. Your reps get tailored suggestions without doing the research manually.
+→ App plays: "Hmm, that's intriguing. We tried a similar tool last year though and the quality wasn't great. The messages felt robotic."
+Alex: Yeah that's a common concern. Our approach is different because we don't write the messages for you. We surface the insights and your reps craft the message. It's augmentation, not automation.
+→ App plays: "Okay, that distinction is helpful. What kind of results are your customers seeing?"
+Alex: On average, teams see a 40% increase in meetings booked within the first 90 days. Our best customers have cut research time by 70%.

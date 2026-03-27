@@ -1,0 +1,141 @@
+Live Transcript
+28 exchanges
+A
+Alex
+0:09
+Thanks for taking the time today.
+
+A
+Alex
+0:11
+I'm Alex from Velocity. How are you doing?
+
+P
+Prospect
+0:17
+Hey Alex, doing well! Busy quarter but happy to chat.
+
+A
+Alex
+0:23
+Totally get it. So I know you're
+
+A
+Alex
+0:26
+Sign up after seeing our webinar.
+
+A
+Alex
+0:27
+or on pipeline acceleration.
+
+A
+Alex
+0:30
+I'd love to learn a bit more about what...
+
+A
+Alex
+0:32
+What caught your eye there?
+
+P
+Prospect
+0:37
+Yeah, we've been struggling with our outbound process. Our SDR team is spending too much time on manual research and not enough time actually selling.
+
+A
+Alex
+0:50
+We work with face that exact
+
+A
+Alex
+0:55
+What SDRs do you have on the team right now?
+
+P
+Prospect
+0:56
+We have about 12 SDRs. We hired aggressively last quarter but ramp time has been brutal. Most of them aren't hitting quota yet.
+
+A
+Alex
+1:04
+Your current tech stack looks like a
+
+A
+Alex
+1:08
+Got it. What does...
+
+P
+Prospect
+1:14
+We have Salesforce and we use LinkedIn Sales Navigator. But honestly our process is pretty manual. Reps are copying and pasting a lot.
+
+A
+Alex
+1:28
+Let me tell you about our platform then.
+
+A
+Alex
+1:31
+Velocity automates the entire prospective.
+
+A
+Alex
+1:33
+Integrate directly with Salesforce.
+
+A
+Alex
+1:38
+Aramco's trust fishing pipeline of over 50 sources.
+
+P
+Prospect
+1:39
+That sounds interesting. But I'm curious, how does it handle personalization? We don't want to send generic spray-and-pray messages.
+
+A
+Alex
+1:48
+My engine analyzes each prospect's
+
+P
+Prospect
+1:49
+Hmm, that's intriguing. We tried a similar tool last year though and the quality wasn't great. The messages felt robotic.
+
+A
+Alex
+1:53
+It's personalized talking points.
+
+P
+Prospect
+1:58
+Okay, that distinction is helpful. What kind of results are your customers seeing?
+
+P
+Prospect
+2:05
+Those numbers are impressive. What does pricing look like?
+
+A
+Alex
+2:10
+Yeah, that's a common concern.
+
+P
+Prospect
+2:15
+Sure, that would be great. I'd also want to loop in my VP of Sales before making any decisions.
+
+P
+Prospect
+2:35
+Yeah, let me check their calendar and get back to you. Can you send me a calendar lin
