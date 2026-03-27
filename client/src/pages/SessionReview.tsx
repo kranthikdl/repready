@@ -148,7 +148,7 @@ export default function SessionReview() {
                 ) : (
                   <div className="rounded-md bg-muted/40 p-4 text-center" data-testid="text-no-summary">
                     <p className="text-sm font-medium">Not enough data to score</p>
-                    <p className="text-xs text-muted-foreground mt-1">Sessions must be at least 5 minutes with captured transcript to generate a summary and scorecard.</p>
+                    <p className="text-xs text-muted-foreground mt-1">Sessions must be at least 1 minute with captured transcript to generate a summary and scorecard.</p>
                   </div>
                 )}
               </TabsContent>
@@ -178,7 +178,7 @@ export default function SessionReview() {
                 {session.summary ? (
                   <Scorecard scorecard={session.summary.scorecard} labels={coachingProfile?.scorecardLabels} />
                 ) : (
-                  <p className="text-muted-foreground text-sm" data-testid="text-no-scorecard">Not enough data to score — session must be at least 5 minutes.</p>
+                  <p className="text-muted-foreground text-sm" data-testid="text-no-scorecard">Not enough data to score — session must be at least 1 minute.</p>
                 )}
               </CardContent>
             </Card>

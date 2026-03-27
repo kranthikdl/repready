@@ -174,7 +174,7 @@ async function handleMessage(
 
       let summary = null;
 
-      const MIN_SESSION_MS = 5 * 60 * 1000; // 5 minutes minimum
+      const MIN_SESSION_MS = 1 * 60 * 1000; // 1 minute minimum
       const sessionDuration = Date.now() - session.startedAt;
       const hasEnoughData = session.transcript.length > 0 && sessionDuration >= MIN_SESSION_MS;
 
