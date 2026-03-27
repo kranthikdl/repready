@@ -12,7 +12,7 @@ export type PromptCategory = typeof promptCategories[number];
 export const severityLevels = ["low", "medium", "high"] as const;
 export type Severity = typeof severityLevels[number];
 
-export const sessionModes = ["simulation", "live", "teams"] as const;
+export const sessionModes = ["simulation", "live", "guided", "teams"] as const;
 export type SessionMode = typeof sessionModes[number];
 
 export const sessionConfigSchema = z.object({

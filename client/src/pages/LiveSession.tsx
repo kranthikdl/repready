@@ -565,6 +565,8 @@ export default function LiveSession() {
         return <><Play className="w-3 h-3 mr-1" /> Simulation</>;
       case "live":
         return <><Mic className="w-3 h-3 mr-1" /> Live</>;
+      case "guided":
+        return <><Mic className="w-3 h-3 mr-1" /> Guided Demo</>;
       case "teams":
         return <><Monitor className="w-3 h-3 mr-1" /> Teams</>;
     }
@@ -642,8 +644,13 @@ export default function LiveSession() {
             </div>
           )}
 
-          {config.mode === "live" && (
-            <div className="mt-auto pt-4">
+          {(config.mode === "live" || config.mode === "guided") && (
+            <div className="mt-auto pt-4 space-y-2">
+              {config.mode === "guided" && (
+                <p className="text-xs text-muted-foreground text-center leading-snug">
+                  Prospect lines auto-play · speak your responses live
+                </p>
+              )}
               {!isRecording ? (
                 <Button
                   data-testid="button-start-recording"

@@ -3,7 +3,7 @@ import type { Server } from "http";
 import { randomUUID } from "crypto";
 import { sessionStorage } from "./storageService";
 import { CoachingEngine } from "./coachingEngine";
-import { getSimulationScript } from "./simulationService";
+import { getSimulationScript, getGuidedScript } from "./simulationService";
 import { generateMockSummary } from "./summaryService";
 import { generateSummaryWithLLM } from "./llmService";
 import type { TranscriptChunk, SessionConfig, CoachingProfile } from "@shared/schema";
@@ -131,6 +131,8 @@ async function handleMessage(
 
       if (config.mode === "simulation") {
         startSimulation(session.id);
+      } else if (config.mode === "guided") {
+        startGuidedSimulation(session.id);
       }
 
       return session.id;
@@ -292,6 +294,45 @@ function startSimulation(sessionId: string) {
   }
 
   const firstDelay = script[0]?.delayMs || 2000;
+  active.simulationTimer = setTimeout(sendNextLine, firstDelay);
+}
+
+function startGuidedSimulation(sessionId: string) {
+  const active = activeSessions.get(sessionId);
+  if (!active) return;
+
+  const script = getGuidedScript(active.config.callType);
+
+  function sendNextLine() {
+    const a = activeSessions.get(sessionId);
+    if (!a || a.simulationIndex >= script.length) return;
+
+    const line = script[a.simulationIndex];
+    const session = sessionStorage.getSession(sessionId);
+    if (!session) return;
+
+    const chunk: TranscriptChunk = {
+      id: randomUUID(),
+      speaker: "prospect",
+      text: line.text,
+      timestamp: Date.now(),
+      sessionTime: Date.now() - session.startedAt,
+    };
+
+    sessionStorage.addTranscriptChunk(sessionId, chunk);
+    a.ws.send(JSON.stringify({ type: "transcript_update", chunk }));
+
+    evaluateCoachingAsync(a, session, sessionId);
+
+    a.simulationIndex++;
+
+    if (a.simulationIndex < script.length) {
+      const nextDelay = script[a.simulationIndex].delayMs;
+      a.simulationTimer = setTimeout(sendNextLine, nextDelay);
+    }
+  }
+
+  const firstDelay = script[0]?.delayMs || 3000;
   active.simulationTimer = setTimeout(sendNextLine, firstDelay);
 }
 

@@ -85,3 +85,18 @@ export const simulationScripts: Record<CallType, ScriptLine[]> = {
 export function getSimulationScript(callType: CallType): ScriptLine[] {
   return simulationScripts[callType];
 }
+
+export function getGuidedScript(callType: CallType): ScriptLine[] {
+  const full = simulationScripts[callType];
+  const result: ScriptLine[] = [];
+  let accumulatedDelay = 0;
+  for (const line of full) {
+    if (line.speaker === "prospect") {
+      result.push({ ...line, delayMs: accumulatedDelay + line.delayMs });
+      accumulatedDelay = 0;
+    } else {
+      accumulatedDelay += line.delayMs;
+    }
+  }
+  return result;
+}
