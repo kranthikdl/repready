@@ -24,3 +24,9 @@ id = "Aj-SjvfVlKGvfiXXo0Z-F"
 uri = "file://RepReady_Pilot.md"
 type = "text"
 title = "RepReady — HubSpot Integration Pilot Brief"
+
+[[outputs]]
+id = "RBsOZF-cqNYCDIF7J6Ne9"
+uri = "file://RepReady_Architecture_Decisions.md"
+type = "text"
+title = "RepReady Architecture Decision Log"
