@@ -4,3 +4,9 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+.claude/
+.claudeignore
+CLAUDE.md
+.mcp-config.json
+.git-credential-helper.sh
+TICKET-CONTEXT.yaml
