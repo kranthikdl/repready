@@ -4,3 +4,11 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Claude CLI artifacts (must never be committed)
+.claude/
+.claudeignore
+.git-credential-helper.sh
+.mcp-config.json
+CLAUDE.md
+TICKET-CONTEXT.yaml
