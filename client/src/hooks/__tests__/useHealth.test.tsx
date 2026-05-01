@@ -42,4 +42,18 @@ describe("useHealth", () => {
     expect(result.current.data).toEqual({ status: "ok", uptime: 42 });
     expect(fetchMock).toHaveBeenCalledWith("/api/health", { credentials: "include" });
   });
+
+  it("resolves to an error state when the health endpoint returns a non-2xx", async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(new Response("down", { status: 503, statusText: "Service Unavailable" })),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result } = renderHook(() => useHealth(), { wrapper: makeWrapper() });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+
+    expect(result.current.data).toBeUndefined();
+    expect((result.current.error as Error).message).toContain("503");
+  });
 });

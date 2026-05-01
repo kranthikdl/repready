@@ -44,4 +44,15 @@ describe("apiGet", () => {
 
     await expect(apiGet("/api/offline")).rejects.toThrow("Failed to fetch");
   });
+
+  it("falls back to statusText when an error response has an empty body", async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(new Response("", { status: 404, statusText: "Not Found" })),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const err = await apiGet("/api/missing").catch((e) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err).toMatchObject({ status: 404, body: "Not Found" });
+  });
 });
