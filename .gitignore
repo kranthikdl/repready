@@ -4,3 +4,11 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Claude Code agent files (must NEVER be committed; .git-credential-helper.sh contains a GitHub token)
+.claude/
+.claudeignore
+.git-credential-helper.sh
+.mcp-config.json
+CLAUDE.md
+TICKET-CONTEXT.yaml
