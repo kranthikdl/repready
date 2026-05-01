@@ -1,3 +1,13 @@
+/**
+ * Production build script.
+ *
+ * Callsite: invoked by `npm run build` (see package.json `scripts.build`).
+ * Also indirectly by Replit deploy: `[deployment].build = ["npm", "run", "build"]` in `.replit`.
+ *
+ * Builds the Vite client and bundles `server/index.ts` with esbuild into
+ * `dist/index.cjs`. Server deps in the `allowlist` are inlined to reduce
+ * cold-start syscalls; everything else stays external.
+ */
 import { build as esbuild } from "esbuild";
 import { build as viteBuild } from "vite";
 import { rm, readFile } from "fs/promises";
