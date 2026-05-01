@@ -4,3 +4,7 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+.claude/
+.claudeignore
+CLAUDE.md
+.git-credential-helper.sh
