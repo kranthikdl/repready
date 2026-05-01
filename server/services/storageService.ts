@@ -46,7 +46,7 @@ class SessionStorage {
     }
   }
 
-  endSession(sessionId: string, summary: SessionSummary): Session | undefined {
+  endSession(sessionId: string, summary: SessionSummary | null): Session | undefined {
     const session = this.sessions.get(sessionId);
     if (session) {
       session.status = "completed";
